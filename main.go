@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/glanceapp/glance/internal/glance"
+	"github.com/Panonim/dynacat/internal/dynacat"
 )
 
 func main() {
-	os.Exit(glance.Main())
+	os.Exit(dynacat.Main())
 }

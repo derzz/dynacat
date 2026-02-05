@@ -2,4 +2,7 @@
 /build
 /playground
 /.idea
-/glance*.yml
+/dynacat*.yml
+docs/dynadev.yml
+POLLING_PLAN*
+Makefile

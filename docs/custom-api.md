@@ -1,5 +1,57 @@
 [Jump to function definitions](#functions)
 
+## Update Intervals
+
+Custom API widgets support configurable client-side update intervals using the `update-interval` property. This controls how often the browser fetches new data from the server for the widget.
+
+### Usage
+
+The `update-interval` property accepts a number followed by a time unit:
+- `s` - seconds
+- `h` - hours
+
+**Examples:**
+```yaml
+- type: custom-api
+  title: Live Data
+  update-interval: 5s    # Updates every 5 seconds
+  url: https://api.example.com/data
+  template: |
+    <div>{{ .JSON.String "value" }}</div>
+
+- type: custom-api
+  title: Hourly Stats  
+  update-interval: 1h    # Updates every hour
+  url: https://api.example.com/stats
+  template: |
+    <div>{{ .JSON.String "count" }}</div>
+```
+
+### Important Notes
+
+- **Only `s` and `h` units are supported.** Using other units like `m` (minutes) or `d` (days) will cause a configuration error.
+- If `update-interval` is not specified, the widget will only update when the page's global update interval triggers.
+- The `update-interval` controls client-side refresh frequency. For server-side caching, use the `cache` property.
+- Each widget with an `update-interval` polls independently, allowing different widgets to update at different rates.
+
+### Error Handling
+
+If you use an invalid format, Dynacat will log an error and fail to start. Common mistakes:
+
+❌ Invalid:
+```yaml
+update-interval: 5      # Missing time unit
+update-interval: 5m     # Minutes not supported
+update-interval: 1d     # Days not supported
+update-interval:        # Empty value
+```
+
+✅ Valid:
+```yaml
+update-interval: 30s    # 30 seconds
+update-interval: 2h     # 2 hours
+```
+
 ## Examples
 
 The best way to get an idea of how the templates work would be with a bunch examples. Here are the most common use cases:
@@ -287,7 +339,7 @@ Output:
 <div data-dynamic-relative-time="1701621922"></div>
 ```
 
-You don't have to worry about the internal implementation, this will then be dynamically populated by Glance on the client side to show the correct relative time.
+You don't have to worry about the internal implementation, this will then be dynamically populated by Dynacat on the client side to show the correct relative time.
 
 The important thing to notice here is that the return value of `toRelativeTime` must be used as an attribute in an HTML tag, be it a `div`, `li`, `span`, etc.
 
@@ -341,6 +393,22 @@ Output:
 <p>Alex is 25 years old</p>
 <p>John is 35 years old</p>
 ```
+
+<hr>
+
+By default, the `custom-api` widget content is refreshed on the page every 1 minute. If you want to change this, you can use the `update-interval` property:
+
+```yaml
+- type: custom-api
+  update-interval: 5s
+  url: https://api.example.com/live-data
+  template: |
+    <div>Current value: {{ .JSON.Int "value" }}</div>
+```
+
+This will make the browser poll for new data every 5 seconds and update the widget if the content has changed.
+
+<hr>
 
 For other ways of selecting data from a JSON Lines response, have a look at the docs for [tidwall/gjson](https://github.com/tidwall/gjson/tree/master?tab=readme-ov-file#json-lines). For example, to  get an array of all names, you can use the following:
 
@@ -423,7 +491,7 @@ The following functions are available on the `Options` object:
 - `BoolOr(key string, default bool) bool`: Returns the value of the key as a boolean, or the default value if the key does not exist.
 - `JSON(key string) JSON`: Returns the value of the key as a stringified `JSON` object, or throws an error if the key does not exist.
 
-The following helper functions provided by Glance are available:
+The following helper functions provided by Dynacat are available:
 
 - `toFloat(i int) float`: Converts an integer to a float.
 - `toInt(f float) int`: Converts a float to an integer.

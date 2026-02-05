@@ -1,7 +1,7 @@
 FROM alpine:3.21
 
 WORKDIR /app
-COPY glance .
+COPY dynacat .
 
 EXPOSE 8080/tcp
-ENTRYPOINT ["/app/glance", "--config", "/app/config/glance.yml"]
+ENTRYPOINT ["/app/dynacat", "--config", "/app/config/dynacat.yml"]

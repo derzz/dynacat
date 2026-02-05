@@ -1,18 +1,17 @@
-<p align="center"><img src="docs/logo.png"></p>
-<h1 align="center">Glance</h1>
+<p align="center"><img width="250px" src="docs/logo.png"></p>
+<h1 align="center">Dynacat</h1>
 <p align="center">
   <a href="#installation">Install</a> •
-  <a href="docs/configuration.md#configuring-glance">Configuration</a> •
-  <a href="https://discord.com/invite/7KQ7Xa9kJd">Discord</a> •
-  <a href="https://github.com/sponsors/glanceapp">Sponsor</a>
+  <a href="docs/configuration.md#configuring-dynacat">Configuration</a> •
+  <a href="#">Discord (Soon)</a> •
 </p>
 <p align="center">
-  <a href="https://github.com/glanceapp/community-widgets">Community widgets</a> •
+  <a href="https://github.com/glanceapp/community-widgets">Glance Community widgets</a> •
   <a href="docs/preconfigured-pages.md">Preconfigured pages</a> •
   <a href="docs/themes.md">Themes</a>
 </p>
 
-<p align="center">A lightweight, highly customizable dashboard that displays<br> your feeds in a beautiful, streamlined interface</p>
+<p align="center">A glance fork that is focused on dynamic updates<br>and easy app integration without the need of writing your own widget's.</p>
 
 ![](docs/images/readme-main-image.png)
 
@@ -28,7 +27,7 @@
 * Docker containers status
 * Server stats
 * Custom widgets
-* [and many more...](docs/configuration.md#configuring-glance)
+* [and many more...](docs/configuration.md#configuring-dynacat)
 
 ### Fast and lightweight
 * Low memory usage
@@ -57,7 +56,7 @@ Easily create your own theme by tweaking a few numbers or choose from one of the
 <br>
 
 ## Configuration
-Configuration is done through YAML files, to learn more about how the layout works, how to add more pages and how to configure widgets, visit the [configuration documentation](docs/configuration.md#configuring-glance).
+Configuration is done through YAML files, to learn more about how the layout works, how to add more pages and how to configure widgets, visit the [configuration documentation](docs/configuration.md#configuring-dynacat).
 <details>
 <summary><strong>Preview example configuration file</strong></summary>
 <br>
@@ -142,7 +141,7 @@ pages:
           - type: releases
             cache: 1d
             repositories:
-              - glanceapp/glance
+              - panonim/dynacat
               - go-gitea/gitea
               - immich-app/immich
               - syncthing/syncthing
@@ -159,18 +158,18 @@ Choose one of the following methods:
 <summary><strong>Docker compose using provided directory structure (recommended)</strong></summary>
 <br>
 
-Create a new directory called `glance` as well as the template files within it by running:
+Create a new directory called `dynacat` as well as the template files within it by running:
 
 ```bash
-mkdir glance && cd glance && curl -sL https://github.com/glanceapp/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2
+mkdir dynacat && cd dynacat && curl -sL https://github.com/dynacat/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2
 ```
 
-*[click here to view the files that will be created](https://github.com/glanceapp/docker-compose-template/tree/main/root)*
+*[click here to view the files that will be created](https://github.com/dynacat/docker-compose-template/tree/main/root)*
 
 Then, edit the following files as desired:
 * `docker-compose.yml` to configure the port, volumes and other containery things
 * `config/home.yml` to configure the widgets or layout of the home page
-* `config/glance.yml` if you want to change the theme or add more pages
+* `config/dynacat.yml` if you want to change the theme or add more pages
 
 <details>
 <summary>Other files you may want to edit</summary>
@@ -202,9 +201,9 @@ Create a `docker-compose.yml` file with the following contents:
 
 ```yaml
 services:
-  glance:
-    container_name: glance
-    image: glanceapp/glance
+  dynacat:
+    container_name: dynacat
+    image: panonim/dynacat
     restart: unless-stopped
     volumes:
       - ./config:/app/config
@@ -212,13 +211,13 @@ services:
       - 8080:8080
 ```
 
-Then, create a new directory called `config` and download the example starting [`glance.yml`](https://github.com/glanceapp/glance/blob/main/docs/glance.yml) file into it by running:
+Then, create a new directory called `config` and download the example starting [`dynacat.yml`](https://github.com/Panonim/dynacat/blob/main/docs/dynacat.yml) file into it by running:
 
 ```bash
-mkdir config && wget -O config/glance.yml https://raw.githubusercontent.com/glanceapp/glance/refs/heads/main/docs/glance.yml
+mkdir config && wget -O config/dynacat.yml https://raw.githubusercontent.com/Panonim/dynacat/refs/heads/main/docs/dynacat.yml
 ```
 
-Feel free to edit the `glance.yml` file to your liking, and when ready run:
+Feel free to edit the `dynacat.yml` file to your liking, and when ready run:
 
 ```bash
 docker compose up -d
@@ -227,7 +226,7 @@ docker compose up -d
 If you encounter any issues, you can check the logs by running:
 
 ```bash
-docker logs glance
+docker logs dynacat
 ```
 
 <hr>
@@ -241,35 +240,26 @@ Precompiled binaries are available for Linux, Windows and macOS (x86, x86_64, AR
 
 ### Linux
 
-Visit the [latest release page](https://github.com/glanceapp/glance/releases/latest) for available binaries. You can place the binary in `/opt/glance/` and have it start with your server via a [systemd service](https://linuxhandbook.com/create-systemd-services/). By default, when running the binary, it will look for a `glance.yml` file in the directory it's placed in. To specify a different path for the config file, use the `--config` option:
+Visit the [latest release page](https://github.com/Panonim/dynacat/releases/latest) for available binaries. You can place the binary in `/opt/dynacat/` and have it start with your server via a [systemd service](https://linuxhandbook.com/create-systemd-services/). By default, when running the binary, it will look for a `dynacat.yml` file in the directory it's placed in. To specify a different path for the config file, use the `--config` option:
 
 ```bash
-/opt/glance/glance --config /etc/glance.yml
+/opt/dynacat/dynacat --config /etc/dynacat.yml
 ```
 
 To grab a starting template for the config file, run:
 
 ```bash
-wget https://raw.githubusercontent.com/glanceapp/glance/refs/heads/main/docs/glance.yml
+wget https://raw.githubusercontent.com/Panonim/dynacat/refs/heads/main/docs/dynacat.yml
 ```
 
 ### Windows
 
-Download and extract the executable from the [latest release](https://github.com/glanceapp/glance/releases/latest) (most likely the file called `glance-windows-amd64.zip` if you're on a 64-bit system) and place it in a folder of your choice. Then, create a new text file called `glance.yml` in the same folder and paste the content from [here](https://raw.githubusercontent.com/glanceapp/glance/refs/heads/main/docs/glance.yml) in it. You should then be able to run the executable and access the dashboard by visiting `http://localhost:8080` in your browser.
+Download and extract the executable from the [latest release](https://github.com/Panonim/dynacat/releases/latest) (most likely the file called `dynacat-windows-amd64.zip` if you're on a 64-bit system) and place it in a folder of your choice. Then, create a new text file called `dynacat.yml` in the same folder and paste the content from [here](https://raw.githubusercontent.com/Panonim/dynacat/refs/heads/main/docs/dynacat.yml) in it. You should then be able to run the executable and access the dashboard by visiting `http://localhost:8080` in your browser.
 
 
 
 <hr>
 </details>
-
-<details>
-<summary><strong>Other</strong></summary>
-<br>
-
-Glance can also be installed through the following 3rd party channels:
-* [Proxmox VE Helper Script](https://community-scripts.github.io/ProxmoxVE/scripts?id=glance)
-* [NixOS package](https://search.nixos.org/packages?channel=unstable&show=glance)
-* [Coolify.io](https://coolify.io/docs/services/glance/)
 
 <hr>
 </details>
@@ -293,13 +283,13 @@ networks:
 <details>
 <summary><strong>Broken layout for markets, bookmarks or other widgets</strong></summary>
 
-This is almost always caused by the browser extension Dark Reader. To fix this, disable dark mode for the domain where Glance is hosted.
+This is almost always caused by the browser extension Dark Reader. To fix this, disable dark mode for the domain where Dynacat is hosted.
 </details>
 
 <details>
-<summary><strong>cannot unmarshal !!map into []glance.page</strong></summary>
+<summary><strong>cannot unmarshal !!map into []dynacat.page</strong></summary>
 
-The most common cause of this is having a `pages` key in your `glance.yml` and then also having a `pages` key inside one of your included pages. To fix this, remove the `pages` key from the top of your included pages.
+The most common cause of this is having a `pages` key in your `dynacat.yml` and then also having a `pages` key inside one of your included pages. To fix this, remove the `pages` key from the top of your included pages.
 
 </details>
 
@@ -344,19 +334,6 @@ Yes, the title of all widgets can be changed by specifying the `title` property 
 # and so on for all widgets...
 ```
 </details>
-
-<br>
-
-## Feature requests
-
-New feature suggestions are always welcome and will be considered, though please keep in mind that some of them may be out of scope for what the project is trying to achieve (or is reasonably capable of). If you have an idea for a new feature and would like to share it, you can do so [here](https://github.com/glanceapp/glance/issues/new?template=feature_request.yml).
-
-Feature requests are tagged with one of the following:
-
-* [Roadmap](https://github.com/glanceapp/glance/labels/roadmap) - will be implemented in a future release
-* [Backlog](https://github.com/glanceapp/glance/labels/backlog) - may be implemented in the future but needs further feedback or interest from the community
-* [Icebox](https://github.com/glanceapp/glance/labels/icebox) - no plans to implement as it doesn't currently align with the project's goals or capabilities, may be revised at a later date
-
 <br>
 
 ## Building from source
@@ -372,13 +349,13 @@ Requirements: [Go](https://go.dev/dl/) >= v1.23
 To build the project for your current OS and architecture, run:
 
 ```bash
-go build -o build/glance .
+go build -o build/dynacat .
 ```
 
 To build for a specific OS and architecture, run:
 
 ```bash
-GOOS=linux GOARCH=amd64 go build -o build/glance .
+GOOS=linux GOARCH=amd64 go build -o build/dynacat .
 ```
 
 [*click here for a full list of GOOS and GOARCH combinations*](https://go.dev/doc/install/source#:~:text=$GOOS%20and%20$GOARCH)
@@ -402,13 +379,13 @@ To build the project and image using just Docker, run:
 *(replace `owner` with your name or organization)*
 
 ```bash
-docker build -t owner/glance:latest .
+docker build -t owner/dynacat:latest .
 ```
 
 If you wish to push the image to a registry (by default Docker Hub), run:
 
 ```bash
-docker push owner/glance:latest
+docker push owner/dynacat:latest
 ```
 
 <hr>
@@ -441,6 +418,4 @@ docker push owner/glance:latest
 
 <br>
 
-## Thank you
-
-To all the people who were generous enough to [sponsor](https://github.com/sponsors/glanceapp) the project and to everyone who has contributed in any way, be it PRs, submitting issues, helping others in the discussions or Discord server, creating guides and tools or just mentioning Glance on social media. Your support is greatly appreciated and helps keep the project going.
+> This is a fork of a ['Glance'](https://github.com/glanceapp/glance) dashboard. 

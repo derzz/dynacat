@@ -1,4 +1,4 @@
-# Configuring Glance
+# Configuring Dynacat
 
 - [Preconfigured page](#preconfigured-page)
 - [The config file](#the-config-file)
@@ -47,7 +47,7 @@
 
 
 ## Preconfigured page
-If you don't want to spend time reading through all the available configuration options and just want something to get you going quickly you can use [this `glance.yml` file](glance.yml) and make changes to it as you see fit. It will give you a page that looks like the following:
+If you don't want to spend time reading through all the available configuration options and just want something to get you going quickly you can use [this `dynacat.yml` file](dynacat.yml) and make changes to it as you see fit. It will give you a page that looks like the following:
 
 ![](images/preconfigured-page-preview.png)
 
@@ -60,14 +60,14 @@ Automatic config reload is supported, meaning that you can make changes to the c
 
 > [!NOTE]
 >
-> If you attempt to start Glance with an invalid config it will exit with an error outright. If you successfully started Glance with a valid config and then made changes to it which result in an error, you'll see that error in the console and Glance will continue to run with the old configuration. You can then continue to make changes and when there are no errors the new configuration will be loaded.
+> If you attempt to start Dynacat with an invalid config it will exit with an error outright. If you successfully started Dynacat with a valid config and then made changes to it which result in an error, you'll see that error in the console and Dynacat will continue to run with the old configuration. You can then continue to make changes and when there are no errors the new configuration will be loaded.
 
 > [!CAUTION]
 >
 > Reloading the configuration file clears your cached data, meaning that you have to request the data anew each time you do this. This can lead to rate limiting for some APIs if you do it too frequently. Having a cache that persists between reloads will be added in the future.
 
 ### Environment variables
-Inserting environment variables is supported anywhere in the config. This is done via the `${ENV_VAR}` syntax. Attempting to use an environment variable that doesn't exist will result in an error and Glance will either not start or load your new config on save. Example:
+Inserting environment variables is supported anywhere in the config. This is done via the `${ENV_VAR}` syntax. Attempting to use an environment variable that doesn't exist will result in an error and Dynacat will either not start or load your new config on save. Example:
 
 ```yaml
 server:
@@ -112,15 +112,15 @@ Alternatively, you can load the contents of a file who's path is provided by an 
 `docker-compose.yml`
 ```yaml
 services:
-  glance:
-    image: glanceapp/glance
+  dynacat:
+    image: Panonim/dynacat
     environment:
       - TOKEN_FILE=/home/user/token
     volumes:
       - /home/user/token:/home/user/token
 ```
 
-`glance.yml`
+`dynacat.yml`
 ```yaml
 token: ${readFileFromEnv:TOKEN_FILE}
 ```
@@ -141,7 +141,7 @@ pages:
 
 The file you are including should not have any additional indentation, its values should be at the top level and the appropriate amount of indentation will be added automatically depending on where the file is included. Example:
 
-`glance.yml`
+`dynacat.yml`
 
 ```yaml
 pages:
@@ -175,16 +175,16 @@ The `$include` directive can be used anywhere in the config file, not just in th
 If you encounter YAML parsing errors when using the `$include` directive, the reported line numbers will likely be incorrect. This is because the inclusion of files is done before the YAML is parsed, as YAML itself does not support file inclusion. To help with debugging in cases like this, you can use the `config:print` command and pipe it into `less -N` to see the full config file with includes resolved and line numbers added:
 
 ```sh
-glance --config /path/to/glance.yml config:print | less -N
+dynacat --config /path/to/dynacat.yml config:print | less -N
 ```
 
-This is a bit more convoluted when running Glance inside a Docker container:
+This is a bit more convoluted when running Dynacat inside a Docker container:
 
 ```sh
-docker run --rm -v ./glance.yml:/app/config/glance.yml glanceapp/glance config:print | less -N
+docker run --rm -v ./dynacat.yml:/app/config/dynacat.yml Panonim/dynacat config:print | less -N
 ```
 
-This assumes that the config you want to print is in your current working directory and is named `glance.yml`.
+This assumes that the config you want to print is in your current working directory and is named `dynacat.yml`.
 
 ## Icons
 
@@ -205,14 +205,14 @@ Icons from the Simple icons library as well as Material Design icons will automa
 
 ```yaml
 icon: auto-invert https://example.com/path/to/icon.png # with a URL
-icon: auto-invert sh:glance-dark # with a selfh.st icon
+icon: auto-invert sh:dynacat-dark # with a selfh.st icon
 ```
 
 This expects the icon to be black and will automatically invert it to white when using a dark theme.
 
 ## Config schema
 
-For property descriptions, validation and autocompletion of the config within your IDE, @not-first has kindly created a [schema](https://github.com/not-first/glance-schema). Massive thanks to them for this, go check it out and give them a star!
+For property descriptions, validation and autocompletion of the config within your IDE, @not-first has kindly created a [schema](https://github.com/not-first/dynacat-schema). Massive thanks to them for this, go check it out and give them a star!
 
 ## Authentication
 
@@ -231,13 +231,13 @@ auth:
 To generate a secret key, run the following command:
 
 ```sh
-./glance secret:make
+./dynacat secret:make
 ```
 
 Or with Docker:
 
 ```sh
-docker run --rm glanceapp/glance secret:make
+docker run --rm Panonim/dynacat secret:make
 ```
 
 ### Using hashed passwords
@@ -245,13 +245,13 @@ docker run --rm glanceapp/glance secret:make
 If you do not want to store plain passwords in your config file or in environment variables, you can hash your password and provide its hash instead:
 
 ```sh
-./glance password:hash mysecretpassword
+./dynacat password:hash mysecretpassword
 ```
 
 Or with Docker:
 
 ```sh
-docker run --rm glanceapp/glance password:hash mysecretpassword
+docker run --rm Panonim/dynacat password:hash mysecretpassword
 ```
 
 Then, in your config file use the `password-hash` property instead of `password`:
@@ -266,14 +266,14 @@ auth:
 
 ### Preventing brute-force attacks
 
-Glance will automatically block IP addresses of users who fail to authenticate 5 times in a row in the span of 5 minutes. In order for this feature to work correctly, Glance must know the real IP address of requests. If you're using a reverse proxy such as nginx, Traefik, NPM, etc, you must set the `proxied` property in the `server` configuration to `true`:
+Dynacat will automatically block IP addresses of users who fail to authenticate 5 times in a row in the span of 5 minutes. In order for this feature to work correctly, Dynacat must know the real IP address of requests. If you're using a reverse proxy such as nginx, Traefik, NPM, etc, you must set the `proxied` property in the `server` configuration to `true`:
 
 ```yaml
 server:
   proxied: true
 ```
 
-When set to `true`, Glance will use the `X-Forwarded-For` header to determine the original IP address of the request, so make sure that your reverse proxy is correctly configured to send that header.
+When set to `true`, Dynacat will use the `X-Forwarded-For` header to determine the original IP address of the request, so make sure that your reverse proxy is correctly configured to send that header.
 
 ## Server
 Server configuration is done through a top level `server` property. Example:
@@ -281,7 +281,7 @@ Server configuration is done through a top level `server` property. Example:
 ```yaml
 server:
   port: 8080
-  assets-path: /home/user/glance-assets
+  assets-path: /home/user/dynacat-assets
 ```
 
 ### Properties
@@ -301,13 +301,13 @@ The address which the server will listen on. Setting it to `localhost` means tha
 A number between 1 and 65,535, so long as that port isn't already used by anything else.
 
 #### `proxied`
-Set to `true` if you're using a reverse proxy in front of Glance. This will make Glance use the `X-Forwarded-*` headers to determine the original request details.
+Set to `true` if you're using a reverse proxy in front of Dynacat. This will make Dynacat use the `X-Forwarded-*` headers to determine the original request details.
 
 #### `base-url`
-The base URL that Glance is hosted under. No need to specify this unless you're using a reverse proxy and are hosting Glance under a directory. If that's the case then you can set this value to `/glance` or whatever the directory is called. Note that the forward slash (`/`) in the beginning is required unless you specify the full domain and path.
+The base URL that Dynacat is hosted under. No need to specify this unless you're using a reverse proxy and are hosting Dynacat under a directory. If that's the case then you can set this value to `/dynacat` or whatever the directory is called. Note that the forward slash (`/`) in the beginning is required unless you specify the full domain and path.
 
 > [!IMPORTANT]
-> You need to strip the `base-url` prefix before forwarding the request to the Glance server.
+> You need to strip the `base-url` prefix before forwarding the request to the Dynacat server.
 > In Caddy you can do this using [`handle_path`](https://caddyserver.com/docs/caddyfile/directives/handle_path) or [`uri strip_prefix`](https://caddyserver.com/docs/caddyfile/directives/uri).
 
 #### `assets-path`
@@ -320,12 +320,12 @@ The path to a directory that will be served by the server under the `/assets/` p
 >
 > If your assets are in:
 > ```
-> /home/user/glance-assets
+> /home/user/dynacat-assets
 > ```
 >
 > You should mount:
 > ```
-> /home/user/glance-assets:/app/assets
+> /home/user/dynacat-assets:/app/assets
 > ```
 >
 > And your config should contain:
@@ -335,10 +335,10 @@ The path to a directory that will be served by the server under the `/assets/` p
 
 ##### Examples
 
-Say you have a directory `glance-assets` with a file `gitea-icon.png` in it and you specify your assets path like:
+Say you have a directory `dynacat-assets` with a file `gitea-icon.png` in it and you specify your assets path like:
 
 ```yaml
-assets-path: /home/user/glance-assets
+assets-path: /home/user/dynacat-assets
 ```
 
 To be able to point to an asset from your assets path, use the `/assets/` path like such:
@@ -362,11 +362,11 @@ You can adjust the various parts of the branding through a top level `branding` 
 ```yaml
 branding:
   custom-footer: |
-    <p>Powered by <a href="https://github.com/glanceapp/glance">Glance</a></p>
+    <p>Powered by <a href="https://github.com/Panonim/dynacat">Dynacat</a></p>
   logo-url: /assets/logo.png
   favicon-url: /assets/logo.png
   app-name: "My Dashboard"
-  app-icon-url: "/assets/app-icon.png"
+  app-icon-url: "/assets/app-icon.svg"
   app-background-color: "#151519"
 ```
 
@@ -379,9 +379,9 @@ branding:
 | logo-text | string | no | G |
 | logo-url | string | no | |
 | favicon-url | string | no | |
-| app-name | string | no | Glance |
-| app-icon-url | string | no | Glance's default icon |
-| app-background-color | string | no | Glance's default background color |
+| app-name | string | no | Dynacat |
+| app-icon-url | string | no | Dynacat's default icon |
+| app-background-color | string | no | Dynacat's default background color |
 
 #### `hide-footer`
 Hides the footer when set to `true`.
@@ -484,7 +484,7 @@ theme:
 
 > [!TIP]
 >
-> Because Glance uses a lot of utility classes it might be difficult to target some elements. To make it easier to style specific widgets, each widget has a `widget-type-{name}` class, so for example if you wanted to make the links inside just the RSS widget bigger you could use the following selector:
+> Because Dynacat uses a lot of utility classes it might be difficult to target some elements. To make it easier to style specific widgets, each widget has a `widget-type-{name}` class, so for example if you wanted to make the links inside just the RSS widget bigger you could use the following selector:
 >
 > ```css
 > .widget-type-rss a {
@@ -726,13 +726,14 @@ When set to `true`, the header (title) of the widget will be hidden. You cannot 
 > If a widget fails to update, a red dot or circle is shown next to the title of that widget indicating that the it is not working. You will not be able to see this if you hide the header.
 
 #### `cache`
-How long to keep the fetched data in memory. The value is a string and must be a number followed by one of s, m, h, d. Examples:
+How long to keep the fetched data in memory. The value is a string and must be a number followed by one of ms, s, m, h, d. Examples:
 
 ```yaml
-cache: 30s # 30 seconds
-cache: 5m  # 5 minutes
-cache: 2h  # 2 hours
-cache: 1d  # 1 day
+cache: 500ms # 500 milliseconds
+cache: 30s   # 30 seconds
+cache: 5m    # 5 minutes
+cache: 2h    # 2 hours
+cache: 1d    # 1 day
 ```
 
 > [!NOTE]
@@ -834,7 +835,7 @@ An array of RSS/atom feeds. The title can optionally be changed.
 The maximum number of articles to show from that specific feed. Useful if you have a feed which posts a lot of articles frequently and you want to prevent it from excessively pushing down articles from other feeds.
 
 ###### `item-link-prefix`
-If an RSS feed isn't returning item links with a base domain and Glance has failed to automatically detect the correct domain you can manually add a prefix to each link with this property.
+If an RSS feed isn't returning item links with a base domain and Dynacat has failed to automatically detect the correct domain you can manually add a prefix to each link with this property.
 
 ###### `headers`
 Optionally specify the headers that will be sent with the request. Example:
@@ -1031,10 +1032,10 @@ Display a list of posts from a specific subreddit.
 
 > [!WARNING]
 >
-> Reddit does not allow unauthorized API access from VPS IPs, if you're hosting Glance on a VPS you will get a 403
+> Reddit does not allow unauthorized API access from VPS IPs, if you're hosting Dynacat on a VPS you will get a 403
 > response. As a workaround you can either [register an app on Reddit](https://ssl.reddit.com/prefs/apps/) and use the
 > generated ID and secret in the widget configuration to authenticate your requests (see `app-auth` property), use a proxy
-> (see `proxy` property) or route the traffic from Glance through a VPN.
+> (see `proxy` property) or route the traffic from Dynacat through a VPN.
 
 Example:
 
@@ -1117,7 +1118,7 @@ r/selfhosted/comments/bsp01i/welcome_to_rselfhosted_please_read_this_first/
 `{SUBREDDIT}` - the subreddit name
 
 ##### `request-url-template`
-A custom request URL that will be used to fetch the data. This is useful when you're hosting Glance on a VPS where Reddit is blocking the requests and you want to route them through a proxy that accepts the URL as either a part of the path or a query parameter.
+A custom request URL that will be used to fetch the data. This is useful when you're hosting Dynacat on a VPS where Reddit is blocking the requests and you want to route them through a proxy that accepts the URL as either a part of the path or a query parameter.
 
 Placeholders:
 
@@ -1129,7 +1130,7 @@ https://your.proxy/?url={REQUEST-URL}
 ```
 
 ##### `proxy`
-A custom HTTP/HTTPS proxy URL that will be used to fetch the data. This is useful when you're hosting Glance on a VPS where Reddit is blocking the requests and you want to bypass the restriction by routing the requests through a proxy. Example:
+A custom HTTP/HTTPS proxy URL that will be used to fetch the data. This is useful when you're hosting Dynacat on a VPS where Reddit is blocking the requests and you want to bypass the restriction by routing the requests through a proxy. Example:
 
 ```yaml
 proxy: http://user:pass@proxy.com:8080
@@ -1331,7 +1332,7 @@ Two widgets side by side in a `full` column:
 ![](images/split-column-widget-preview.png)
 
 <details>
-<summary>View <code>glance.yml</code></summary>
+<summary>View <code>dynacat.yml</code></summary>
 <br>
 
 ```yaml
@@ -1358,7 +1359,7 @@ You can also achieve a number of different full page layouts using just this wid
 ![](images/split-column-widget-3-columns.png)
 
 <details>
-<summary>View <code>glance.yml</code></summary>
+<summary>View <code>dynacat.yml</code></summary>
 <br>
 
 ```yaml
@@ -1388,7 +1389,7 @@ pages:
 ![](images/split-column-widget-4-columns.png)
 
 <details>
-<summary>View <code>glance.yml</code></summary>
+<summary>View <code>dynacat.yml</code></summary>
 <br>
 
 ```yaml
@@ -1422,7 +1423,7 @@ Masonry layout with up to 5 columns where all columns have equal width (and the 
 ![](images/split-column-widget-masonry.png)
 
 <details>
-<summary>View <code>glance.yml</code></summary>
+<summary>View <code>dynacat.yml</code></summary>
 <br>
 
 ```yaml
@@ -1473,14 +1474,14 @@ Display data from a JSON API using a custom template.
 
 > [!NOTE]
 >
-> The configuration of this widget requires some basic knowledge of programming, HTML, CSS, the Go template language and Glance-specific concepts.
+> The configuration of this widget requires some basic knowledge of programming, HTML, CSS, the Go template language and Dynacat-specific concepts.
 
 Examples:
 
 ![](images/custom-api-preview-1.png)
 
 <details>
-<summary>View <code>glance.yml</code></summary>
+<summary>View <code>dynacat.yml</code></summary>
 <br>
 
 ```yaml
@@ -1497,7 +1498,7 @@ Examples:
 ![](images/custom-api-preview-2.png)
 
 <details>
-<summary>View <code>glance.yml</code></summary>
+<summary>View <code>dynacat.yml</code></summary>
 <br>
 
 ```yaml
@@ -1530,7 +1531,7 @@ Examples:
 ![](images/custom-api-preview-3.png)
 
 <details>
-<summary>View <code>glance.yml</code></summary>
+<summary>View <code>dynacat.yml</code></summary>
 <br>
 
 ```yaml
@@ -1565,13 +1566,34 @@ Examples:
 | frameless | boolean | no | false |
 | allow-insecure | boolean | no | false |
 | skip-json-validation | boolean | no | false |
+| update-interval | string | no | |
 | template | string | yes | |
 | options | map | no | |
 | parameters | key (string) & value (string|array) | no | |
 | subrequests | map of requests | no | |
 
 ##### `url`
-The URL to fetch the data from. It must be accessible from the server that Glance is running on.
+The URL to fetch the data from. It must be accessible from the server that Dynacat is running on.
+
+##### `update-interval`
+Controls how often the browser fetches new data from the server for this widget. This is a client-side refresh interval that determines how frequently the widget updates in the browser. The value must be specified as a number followed by a time unit: `s` (seconds) or `h` (hours). For example: `5s`, `30s`, `1h`, `2h`. 
+
+If not specified, the widget will only update when the page's global update interval triggers (if configured). Setting this allows individual custom-api widgets to refresh more frequently than the page's default update interval.
+
+**Note:** This only affects how often the browser requests updated content. The server-side caching behavior is controlled separately by the `cache` property.
+
+**Important:** Only use time units `s` (seconds) or `h` (hours). Using other units like `m` (minutes), `d` (days), or omitting the unit will result in a configuration error.
+
+Example:
+```yaml
+- type: custom-api
+  title: Live Stock Price
+  update-interval: 5s  # Updates every 5 seconds
+  cache: 5s
+  url: https://api.example.com/stock/AAPL
+  template: |
+    <div class="size-h3">${{ .JSON.String "price" }}</div>
+```
 
 ##### `headers`
 Optionally specify the headers that will be sent with the request. Example:
@@ -1839,7 +1861,7 @@ Each bar represents a 2 hour interval. The yellow background represents sunrise 
 | show-area-name | boolean | no | false |
 
 ##### `location`
-The name of the city and country to fetch weather information for. Attempting to launch the applcation with an invalid location will result in an error. You can use the [gecoding API page](https://open-meteo.com/en/docs/geocoding-api) to search for your specific location. Glance will use the first result from the list if there are multiple.
+The name of the city and country to fetch weather information for. Attempting to launch the applcation with an invalid location will result in an error. You can use the [gecoding API page](https://open-meteo.com/en/docs/geocoding-api) to search for your specific location. Dynacat will use the first result from the list if there are multiple.
 
 ##### `units`
 Whether to show the temperature in celsius or fahrenheit, possible values are `metric` or `imperial`.
@@ -1975,7 +1997,7 @@ The title used to indicate the site.
 
 `url`
 
-The URL of the monitored service, which must be reachable by Glance, and will be used as the link to go to when clicking on the title. If `check-url` is not specified, this is used as the status check.
+The URL of the monitored service, which must be reachable by Dynacat, and will be used as the link to go to when clicking on the title. If `check-url` is not specified, this is used as the status check.
 
 `check-url`
 
@@ -2031,7 +2053,7 @@ Example:
   repositories:
     - go-gitea/gitea
     - jellyfin/jellyfin
-    - glanceapp/glance
+    - Panonim/dynacat
     - codeberg:redict/redict
     - gitlab:fdroid/fdroidclient
     - dockerhub:gotify/server
@@ -2058,7 +2080,7 @@ A list of repositores to fetch the latest release for. Only the name/repo is req
 ```yaml
 repositories:
   - gitlab:inkscape/inkscape
-  - dockerhub:glanceapp/glance
+  - dockerhub:Panonim/dynacat
   - codeberg:redict/redict
 ```
 
@@ -2086,7 +2108,7 @@ To include prereleases you can specify the repository as an object and use the `
 ```yaml
 repositories:
   - gitlab:inkscape/inkscape
-  - repository: glanceapp/glance
+  - repository: Panonim/dynacat
     include-prereleases: true
   - codeberg:redict/redict
 ```
@@ -2097,17 +2119,17 @@ Shows an icon of the source (GitHub/GitLab/Codeberg/Docker Hub) next to the repo
 ##### `token`
 Without authentication Github allows for up to 60 requests per hour. You can easily exceed this limit and start seeing errors if you're tracking lots of repositories or your cache time is low. To circumvent this you can [create a read only token from your Github account](https://github.com/settings/personal-access-tokens/new) and provide it here.
 
-You can also specify the value for this token through an ENV variable using the syntax `${GITHUB_TOKEN}` where `GITHUB_TOKEN` is the name of the variable that holds the token. If you've installed Glance through docker you can specify the token in your docker-compose:
+You can also specify the value for this token through an ENV variable using the syntax `${GITHUB_TOKEN}` where `GITHUB_TOKEN` is the name of the variable that holds the token. If you've installed Dynacat through docker you can specify the token in your docker-compose:
 
 ```yaml
 services:
-  glance:
-    image: glanceapp/glance
+  dynacat:
+    image: Panonim/dynacat
     environment:
       - GITHUB_TOKEN=<your token>
 ```
 
-and then use it in your `glance.yml` like this:
+and then use it in your `dynacat.yml` like this:
 
 ```yaml
 - type: releases
@@ -2115,7 +2137,7 @@ and then use it in your `glance.yml` like this:
   repositories: ...
 ```
 
-This way you can safely check your `glance.yml` in version control without exposing the token.
+This way you can safely check your `dynacat.yml` in version control without exposing the token.
 
 ##### `gitlab-token`
 Same as the above but used when fetching GitLab releases.
@@ -2139,12 +2161,12 @@ Display the status of your Docker containers along with an icon and an optional 
 
 > [!NOTE]
 >
-> The widget requires access to `docker.sock`. If you're running Glance inside a container, this can be done by mounting the socket as a volume:
+> The widget requires access to `docker.sock`. If you're running Dynacat inside a container, this can be done by mounting the socket as a volume:
 >
 > ```yaml
 > services:
->   glance:
->     image: glanceapp/glance
+>   dynacat:
+>     image: Panonim/dynacat
 >     volumes:
 >       - /var/run/docker.sock:/var/run/docker.sock
 > ```
@@ -2155,13 +2177,13 @@ Configuration of the containers is done via labels applied to each container:
   jellyfin:
     image: jellyfin/jellyfin:latest
     labels:
-      glance.name: Jellyfin
-      glance.icon: si:jellyfin
-      glance.url: https://jellyfin.domain.com
-      glance.description: Movies & shows
+      dynacat.name: Jellyfin
+      dynacat.icon: si:jellyfin
+      dynacat.url: https://jellyfin.domain.com
+      dynacat.description: Movies & shows
 ```
 
-Alternatively, you can also define the values within your `glance.yml` via the `containers` property, where the key is the container name and each value is the same as the labels but without the "glance." prefix:
+Alternatively, you can also define the values within your `dynacat.yml` via the `containers` property, where the key is the container name and each value is the same as the labels but without the "dynacat." prefix:
 
 ```yaml
 - type: docker-containers
@@ -2174,7 +2196,7 @@ Alternatively, you can also define the values within your `glance.yml` via the `
       hide: false
 ```
 
-For services with multiple containers you can specify a `glance.id` on the "main" container and `glance.parent` on each "child" container:
+For services with multiple containers you can specify a `dynacat.id` on the "main" container and `dynacat.parent` on each "child" container:
 
 <details>
 <summary>View <code>docker-compose.yml</code></summary>
@@ -2185,29 +2207,29 @@ services:
   immich-server:
     image: ghcr.io/immich-app/immich-server
     labels:
-      glance.name: Immich
-      glance.icon: si:immich
-      glance.url: https://immich.domain.com
-      glance.description: Image & video management
-      glance.id: immich
+      dynacat.name: Immich
+      dynacat.icon: si:immich
+      dynacat.url: https://immich.domain.com
+      dynacat.description: Image & video management
+      dynacat.id: immich
 
   redis:
     image: docker.io/redis:6.2-alpine
     labels:
-      glance.parent: immich
-      glance.name: Redis
+      dynacat.parent: immich
+      dynacat.name: Redis
 
   database:
     image: docker.io/tensorchord/pgvecto-rs:pg14-v0.2.0
     labels:
-      glance.parent: immich
-      glance.name: DB
+      dynacat.parent: immich
+      dynacat.name: DB
 
   proxy:
     image: nginx:stable
     labels:
-      glance.parent: immich
-      glance.name: Proxy
+      dynacat.parent: immich
+      dynacat.name: Proxy
 ```
 </details>
 <br>
@@ -2231,7 +2253,7 @@ If any of the child containers are down, their status will propagate up to the p
 | running-only | boolean | no | false |
 
 ##### `hide-by-default`
-Whether to hide the containers by default. If set to `true` you'll have to manually add a `glance.hide: false` label to each container you want to display. By default all containers will be shown and if you want to hide a specific container you can add a `glance.hide: true` label.
+Whether to hide the containers by default. If set to `true` you'll have to manually add a `dynacat.hide: false` label to each container you want to display. By default all containers will be shown and if you want to hide a specific container you can add a `dynacat.hide: true` label.
 
 ##### `format-container-names`
 When set to `true`, automatically converts container names such as `container_name_1` into `Container Name 1`.
@@ -2240,7 +2262,7 @@ When set to `true`, automatically converts container names such as `container_na
 The path to the Docker socket. This can also be a [remote socket](https://docs.docker.com/engine/daemon/remote-access/) or proxied socket using something like [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy).
 
 ###### `category`
-Filter to only the containers which have this category specified via the `glance.category` label. Useful if you want to have multiple containers widgets, each showing a different set of containers.
+Filter to only the containers which have this category specified via the `dynacat.category` label. Useful if you want to have multiple containers widgets, each showing a different set of containers.
 
 <details>
 <summary>View example</summary>
@@ -2252,26 +2274,26 @@ services:
   jellyfin:
     image: jellyfin/jellyfin:latest
     labels:
-      glance.name: Jellyfin
-      glance.icon: si:jellyfin
-      glance.url: https://jellyfin.domain.com
-      glance.category: media
+      dynacat.name: Jellyfin
+      dynacat.icon: si:jellyfin
+      dynacat.url: https://jellyfin.domain.com
+      dynacat.category: media
 
   gitea:
     image: gitea/gitea:latest
     labels:
-      glance.name: Gitea
-      glance.icon: si:gitea
-      glance.url: https://gitea.domain.com
-      glance.category: dev-tools
+      dynacat.name: Gitea
+      dynacat.icon: si:gitea
+      dynacat.url: https://gitea.domain.com
+      dynacat.category: dev-tools
 
   vaultwarden:
     image: vaultwarden/server:latest
     labels:
-      glance.name: Vaultwarden
-      glance.icon: si:vaultwarden
-      glance.url: https://vaultwarden.domain.com
-      glance.category: dev-tools
+      dynacat.name: Vaultwarden
+      dynacat.icon: si:vaultwarden
+      dynacat.url: https://vaultwarden.domain.com
+      dynacat.category: dev-tools
 ```
 
 Then you can use the `category` property to filter the containers:
@@ -2294,15 +2316,15 @@ Whether to only show running containers. If set to `true` only containers that a
 #### Labels
 | Name | Description |
 | ---- | ----------- |
-| glance.name | The name displayed in the UI. If not specified, the name of the container will be used. |
-| glance.icon | See [Icons](#icons) for more information on how to specify icons |
-| glance.url | The URL that the user will be redirected to when clicking on the container. |
-| glance.same-tab | Whether to open the link in the same or a new tab. Default is `false`. |
-| glance.description | A short description displayed in the UI. Default is empty. |
-| glance.hide | Whether to hide the container. If set to `true` the container will not be displayed. Defaults to `false`. |
-| glance.id | The custom ID of the container. Used to group containers under a single parent. |
-| glance.parent | The ID of the parent container. Used to group containers under a single parent. |
-| glance.category | The category of the container. Used to filter containers by category. |
+| dynacat.name | The name displayed in the UI. If not specified, the name of the container will be used. |
+| dynacat.icon | See [Icons](#icons) for more information on how to specify icons |
+| dynacat.url | The URL that the user will be redirected to when clicking on the container. |
+| dynacat.same-tab | Whether to open the link in the same or a new tab. Default is `false`. |
+| dynacat.description | A short description displayed in the UI. Default is empty. |
+| dynacat.hide | Whether to hide the container. If set to `true` the container will not be displayed. Defaults to `false`. |
+| dynacat.id | The custom ID of the container. Used to group containers under a single parent. |
+| dynacat.parent | The ID of the parent container. Used to group containers under a single parent. |
+| dynacat.category | The category of the container. Used to filter containers by category. |
 
 ### DNS Stats
 Display statistics from a self-hosted ad-blocking DNS resolver such as AdGuard Home, Pi-hole, or Technitium.
@@ -2371,7 +2393,7 @@ Whether to hide the list of top blocked domains.
 Whether to display the relative time in the graph in `12h` or `24h` format.
 
 ### Server Stats
-Display statistics such as CPU usage, memory usage and disk usage of the server Glance is running on or other servers.
+Display statistics such as CPU usage, memory usage and disk usage of the server Dynacat is running on or other servers.
 
 Example:
 
@@ -2390,7 +2412,7 @@ Preview:
 >
 > This widget is currently under development, some features might not function as expected or may change.
 
-To display data from a remote server you need to have the Glance Agent running on that server. You can download the agent from [here](https://github.com/glanceapp/agent), though keep in mind that it is still in development and may not work as expected. Support for other providers such as Glances will be added in the future.
+To display data from a remote server you need to have the Dynacat Agent running on that server. You can download the agent from [here](https://github.com/dynacat/agent), though keep in mind that it is still in development and may not work as expected. Support for other providers such as Dynacats will be added in the future.
 
 In the event that the CPU temperature goes over 80°C, a flame icon will appear next to the CPU. The progress indicators will also turn red (or the equivalent of your negative color) to hopefully grab your attention if anything is unusually high:
 
@@ -2402,7 +2424,7 @@ In the event that the CPU temperature goes over 80°C, a flame icon will appear 
 | servers | array | no |  |
 
 ##### `servers`
-If not provided it will display the statistics of the server Glance is running on.
+If not provided it will display the statistics of the server Dynacat is running on.
 
 ##### Properties for both `local` and `remote` servers
 | Name | Type | Required | Default |
@@ -2445,7 +2467,7 @@ If set to `true` you'll have to manually make each mountpoint visible by adding 
           hide: false
 ```
 
-This is useful if you're running Glance inside of a container which usually mounts a lot of irrelevant filesystems.
+This is useful if you're running Dynacat inside of a container which usually mounts a lot of irrelevant filesystems.
 
 ###### `mountpoints`
 A map of mountpoints to display disk usage for. The key is the path to the mountpoint and the value is an object with optional properties. Example:
@@ -2495,7 +2517,7 @@ Example:
 
 ```yaml
 - type: repository
-  repository: glanceapp/glance
+  repository: Panonim/dynacat
   pull-requests-limit: 5
   issues-limit: 3
   commits-limit: 3

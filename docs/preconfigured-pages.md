@@ -13,7 +13,7 @@ Pull requests with your page configurations are welcome!
 ![](images/startpage-preview.png)
 
 <details>
-<summary>View config (requires Glance <code>v0.6.0</code> or higher)</summary>
+<summary>View config (requires Dynacat <code>v0.6.0</code> or higher)</summary>
 
 ```yaml
 - name: Startpage
@@ -83,7 +83,7 @@ Pull requests with your page configurations are welcome!
 ![](images/markets-page-preview.png)
 
 <details>
-<summary>View config (requires Glance <code>v0.6.0</code> or higher)</summary>
+<summary>View config (requires Dynacat <code>v0.6.0</code> or higher)</summary>
 
 ```yaml
 - name: Markets
@@ -180,7 +180,7 @@ Pull requests with your page configurations are welcome!
 ![](images/gaming-page-preview.png)
 
 <details>
-<summary>View config (requires Glance <code>v0.6.0</code> or higher)</summary>
+<summary>View config (requires Dynacat <code>v0.6.0</code> or higher)</summary>
 
 ```yaml
 - name: Gaming

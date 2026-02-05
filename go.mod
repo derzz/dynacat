@@ -1,4 +1,4 @@
-module github.com/glanceapp/glance
+module github.com/Panonim/dynacat
 
 go 1.24.3
 
