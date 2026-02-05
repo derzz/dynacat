@@ -43,13 +43,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prepare image names
+        run: |
+          echo "IMAGE_REPO=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(echo '${{ github.ref_name }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "DOCKERHUB_USER_LOWER=$(echo '${{ secrets.DOCKERHUB_USERNAME }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Build and push Docker images
         uses: docker/build-push-action@v4
         with:
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ghcr.io/${{ toLower(github.repository) }}:${{ toLower(github.ref_name) }}
-            docker.io/${{ toLower(secrets.DOCKERHUB_USERNAME) }}/dynacat:${{ toLower(github.ref_name) }}
+            ghcr.io/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
+            docker.io/${{ env.DOCKERHUB_USER_LOWER }}/dynacat:${{ env.IMAGE_TAG }}
           file: ./Dockerfile
           context: .
