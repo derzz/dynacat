@@ -3,16 +3,15 @@
 <p align="center">
   <a href="#installation">Install</a> •
   <a href="docs/configuration.md#configuring-dynacat">Configuration</a> •
-  <a href="https://discord.com/invite/7KQ7Xa9kJd">Discord</a> •
-  <a href="https://github.com/sponsors/dynacatapp">Sponsor</a>
+  <a href="#">Discord (Soon)</a> •
 </p>
 <p align="center">
-  <a href="https://github.com/dynacatapp/community-widgets">Community widgets</a> •
+  <a href="https://github.com/glanceapp/community-widgets">Glance Community widgets</a> •
   <a href="docs/preconfigured-pages.md">Preconfigured pages</a> •
   <a href="docs/themes.md">Themes</a>
 </p>
 
-<p align="center">A lightweight, highly customizable dashboard that displays<br> your feeds in a beautiful, streamlined interface</p>
+<p align="center">A glance fork that is focused on dynamic updates<br>and easy app integration without the need of writing your own widget's.</p>
 
 ![](docs/images/readme-main-image.png)
 
@@ -142,7 +141,7 @@ pages:
           - type: releases
             cache: 1d
             repositories:
-              - Panonim/dynacat
+              - panonim/dynacat
               - go-gitea/gitea
               - immich-app/immich
               - syncthing/syncthing
@@ -162,10 +161,10 @@ Choose one of the following methods:
 Create a new directory called `dynacat` as well as the template files within it by running:
 
 ```bash
-mkdir dynacat && cd dynacat && curl -sL https://github.com/dynacatapp/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2
+mkdir dynacat && cd dynacat && curl -sL https://github.com/dynacat/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2
 ```
 
-*[click here to view the files that will be created](https://github.com/dynacatapp/docker-compose-template/tree/main/root)*
+*[click here to view the files that will be created](https://github.com/dynacat/docker-compose-template/tree/main/root)*
 
 Then, edit the following files as desired:
 * `docker-compose.yml` to configure the port, volumes and other containery things
@@ -204,7 +203,7 @@ Create a `docker-compose.yml` file with the following contents:
 services:
   dynacat:
     container_name: dynacat
-    image: Panonim/dynacat
+    image: panonim/dynacat
     restart: unless-stopped
     volumes:
       - ./config:/app/config
@@ -261,15 +260,6 @@ Download and extract the executable from the [latest release](https://github.com
 
 <hr>
 </details>
-
-<details>
-<summary><strong>Other</strong></summary>
-<br>
-
-Dynacat can also be installed through the following 3rd party channels:
-* [Proxmox VE Helper Script](https://community-scripts.github.io/ProxmoxVE/scripts?id=dynacat)
-* [NixOS package](https://search.nixos.org/packages?channel=unstable&show=dynacat)
-* [Coolify.io](https://coolify.io/docs/services/dynacat/)
 
 <hr>
 </details>
@@ -344,19 +334,6 @@ Yes, the title of all widgets can be changed by specifying the `title` property 
 # and so on for all widgets...
 ```
 </details>
-
-<br>
-
-## Feature requests
-
-New feature suggestions are always welcome and will be considered, though please keep in mind that some of them may be out of scope for what the project is trying to achieve (or is reasonably capable of). If you have an idea for a new feature and would like to share it, you can do so [here](https://github.com/Panonim/dynacat/issues/new?template=feature_request.yml).
-
-Feature requests are tagged with one of the following:
-
-* [Roadmap](https://github.com/Panonim/dynacat/labels/roadmap) - will be implemented in a future release
-* [Backlog](https://github.com/Panonim/dynacat/labels/backlog) - may be implemented in the future but needs further feedback or interest from the community
-* [Icebox](https://github.com/Panonim/dynacat/labels/icebox) - no plans to implement as it doesn't currently align with the project's goals or capabilities, may be revised at a later date
-
 <br>
 
 ## Building from source
