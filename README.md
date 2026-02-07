@@ -161,10 +161,19 @@ Choose one of the following methods:
 Create a new directory called `dynacat` as well as the template files within it by running:
 
 ```bash
-mkdir dynacat && cd dynacat && curl -sL https://github.com/dynacat/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2
+mkdir dynacat && cd dynacat && \
+curl -sL https://github.com/glanceapp/docker-compose-template/archive/refs/heads/main.tar.gz | tar -xzf - --strip-components 2 && \
+sed -i \
+  -e 's/^  glance:/  dynacat:/' \
+  -e 's/^    container_name: glance/    container_name: dynacat/' \
+  -e 's/^    image: glanceapp\/glance/    image: panonim\/dynacat/' \
+  docker-compose.yml && \
+mv config/glance.yml config/dynacat.yml
 ```
 
-*[click here to view the files that will be created](https://github.com/dynacat/docker-compose-template/tree/main/root)*
+**NOTE: Remember to keep the command exactly as-is; otherwise, the image won't work.**
+
+*[click here to view the files that will be created](https://github.com/glanceapp/docker-compose-template/tree/main/root)*
 
 Then, edit the following files as desired:
 * `docker-compose.yml` to configure the port, volumes and other containery things
@@ -231,39 +240,6 @@ docker logs dynacat
 
 <hr>
 </details>
-
-<details>
-<summary><strong>Manual binary installation</strong></summary>
-<br>
-
-Precompiled binaries are available for Linux, Windows and macOS (x86, x86_64, ARM and ARM64 architectures).
-
-### Linux
-
-Visit the [latest release page](https://github.com/Panonim/dynacat/releases/latest) for available binaries. You can place the binary in `/opt/dynacat/` and have it start with your server via a [systemd service](https://linuxhandbook.com/create-systemd-services/). By default, when running the binary, it will look for a `dynacat.yml` file in the directory it's placed in. To specify a different path for the config file, use the `--config` option:
-
-```bash
-/opt/dynacat/dynacat --config /etc/dynacat.yml
-```
-
-To grab a starting template for the config file, run:
-
-```bash
-wget https://raw.githubusercontent.com/Panonim/dynacat/refs/heads/main/docs/dynacat.yml
-```
-
-### Windows
-
-Download and extract the executable from the [latest release](https://github.com/Panonim/dynacat/releases/latest) (most likely the file called `dynacat-windows-amd64.zip` if you're on a 64-bit system) and place it in a folder of your choice. Then, create a new text file called `dynacat.yml` in the same folder and paste the content from [here](https://raw.githubusercontent.com/Panonim/dynacat/refs/heads/main/docs/dynacat.yml) in it. You should then be able to run the executable and access the dashboard by visiting `http://localhost:8080` in your browser.
-
-
-
-<hr>
-</details>
-
-<hr>
-</details>
-
 <br>
 
 ## Common issues
@@ -298,12 +274,7 @@ The most common cause of this is having a `pages` key in your `dynacat.yml` and 
 ## FAQ
 <details>
 <summary><strong>Does the information on the page update automatically?</strong></summary>
-No, a page refresh is required to update the information. Some things do dynamically update where it makes sense, like the clock widget and the relative time showing how long ago something happened.
-</details>
-
-<details>
-<summary><strong>How frequently do widgets update?</strong></summary>
-No requests are made periodically in the background, information is only fetched upon loading the page and then cached. The default cache lifetime is different for each widget and can be configured.
+Yes! That's the whole point of Dynacat
 </details>
 
 <details>
@@ -381,39 +352,6 @@ To build the project and image using just Docker, run:
 ```bash
 docker build -t owner/dynacat:latest .
 ```
-
-If you wish to push the image to a registry (by default Docker Hub), run:
-
-```bash
-docker push owner/dynacat:latest
-```
-
-<hr>
-</details>
-
-<br>
-
-## Contributing guidelines
-
-* Before working on a new feature it's preferable to submit a feature request first and state that you'd like to implement it yourself
-* Please don't submit PRs for feature requests that are either in the roadmap<sup>[1]</sup>, backlog<sup>[2]</sup> or icebox<sup>[3]</sup>
-* Use `dev` for the base branch if you're adding new features or fixing bugs, otherwise use `main`
-* Avoid introducing new dependencies
-* Avoid making backwards-incompatible configuration changes
-* Avoid introducing new colors or hard-coding colors, use the standard `primary`, `positive` and `negative`
-* For icons, try to use [heroicons](https://heroicons.com/) where applicable
-* Provide a screenshot of the changes if UI related where possible
-* No `package.json`
-
-<details>
-<summary><strong><sup>[1] [2] [3]</sup></strong></summary>
-
-[1] The feature likely already has work put into it that may conflict with your implementation
-
-[2] The demand, implementation or functionality for this feature is not yet clear
-
-[3] No plans to add this feature for the time being
-
 </details>
 
 <br>
