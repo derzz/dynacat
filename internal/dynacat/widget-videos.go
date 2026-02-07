@@ -36,6 +36,11 @@ type videosWidget struct {
 func (widget *videosWidget) initialize() error {
 	widget.withTitle("Videos").withCacheDuration(time.Hour)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(1 * time.Hour)
+		widget.UpdateInterval = &interval
+	}
+
 	if widget.Limit <= 0 {
 		widget.Limit = 25
 	}

@@ -26,6 +26,11 @@ type changeDetectionWidget struct {
 func (widget *changeDetectionWidget) initialize() error {
 	widget.withTitle("Change Detection").withCacheDuration(1 * time.Hour)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(30 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	if widget.Limit <= 0 {
 		widget.Limit = 10
 	}

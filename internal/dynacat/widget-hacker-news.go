@@ -28,6 +28,11 @@ func (widget *hackerNewsWidget) initialize() error {
 		withTitleURL("https://news.ycombinator.com/").
 		withCacheDuration(30 * time.Minute)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(5 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	if widget.Limit <= 0 {
 		widget.Limit = 15
 	}

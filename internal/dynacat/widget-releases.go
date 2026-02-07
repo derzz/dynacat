@@ -29,7 +29,12 @@ type releasesWidget struct {
 }
 
 func (widget *releasesWidget) initialize() error {
-	widget.withTitle("Releases").withCacheDuration(2 * time.Hour)
+	widget.withTitle("Releases").withCacheDuration(3 * time.Hour)
+
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(3 * time.Hour)
+		widget.UpdateInterval = &interval
+	}
 
 	if widget.Limit <= 0 {
 		widget.Limit = 10

@@ -72,6 +72,11 @@ func (widget *dnsStatsWidget) initialize() error {
 		withTitleURL(titleURL).
 		withCacheDuration(10 * time.Minute)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(10 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	switch widget.Service {
 	case dnsServiceAdguard:
 	case dnsServicePiholeV6:

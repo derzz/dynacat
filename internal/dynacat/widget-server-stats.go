@@ -24,6 +24,11 @@ func (widget *serverStatsWidget) initialize() error {
 	widget.withTitle("Server Stats").withCacheDuration(15 * time.Second)
 	widget.widgetBase.WIP = true
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(1 * time.Millisecond)
+		widget.UpdateInterval = &interval
+	}
+
 	if len(widget.Servers) == 0 {
 		widget.Servers = []serverStatsRequest{{Type: "local"}}
 	}

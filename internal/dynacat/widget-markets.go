@@ -27,6 +27,11 @@ type marketsWidget struct {
 func (widget *marketsWidget) initialize() error {
 	widget.withTitle("Markets").withCacheDuration(time.Hour)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(10 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	// legacy support, remove in v0.10.0
 	if len(widget.MarketRequests) == 0 {
 		widget.MarketRequests = widget.StocksRequests

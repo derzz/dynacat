@@ -49,6 +49,10 @@ type rssWidget struct {
 func (widget *rssWidget) initialize() error {
 	widget.withTitle("RSS Feed").withCacheDuration(2 * time.Hour)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(15 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
 	if widget.Limit <= 0 {
 		widget.Limit = 25
 	}

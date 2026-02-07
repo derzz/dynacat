@@ -17,6 +17,11 @@ type oldCalendarWidget struct {
 func (widget *oldCalendarWidget) initialize() error {
 	widget.withTitle("Calendar").withCacheOnTheHour()
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(1 * time.Hour)
+		widget.UpdateInterval = &interval
+	}
+
 	return nil
 }
 

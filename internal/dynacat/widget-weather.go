@@ -35,6 +35,11 @@ var timeLabels24h = [12]string{"02:00", "04:00", "06:00", "08:00", "10:00", "12:
 func (widget *weatherWidget) initialize() error {
 	widget.withTitle("Weather").withCacheOnTheHour()
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(1 * time.Hour)
+		widget.UpdateInterval = &interval
+	}
+
 	if widget.Location == "" {
 		return fmt.Errorf("location is required")
 	}

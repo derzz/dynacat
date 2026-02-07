@@ -88,6 +88,11 @@ func (widget *redditWidget) initialize() error {
 		withTitleURL("https://www.reddit.com/r/" + widget.Subreddit + "/").
 		withCacheDuration(30 * time.Minute)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(25 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	return nil
 }
 

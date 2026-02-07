@@ -27,6 +27,11 @@ func (widget *twitchGamesWidget) initialize() error {
 		withTitleURL("https://www.twitch.tv/directory?sort=VIEWER_COUNT").
 		withCacheDuration(time.Minute * 10)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(35 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	if widget.Limit <= 0 {
 		widget.Limit = 10
 	}

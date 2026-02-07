@@ -31,6 +31,11 @@ type extensionWidget struct {
 func (widget *extensionWidget) initialize() error {
 	widget.withTitle(extensionWidgetDefaultTitle).withCacheDuration(time.Minute * 30)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(5 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	if widget.URL == "" {
 		return errors.New("URL is required")
 	}

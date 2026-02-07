@@ -23,7 +23,12 @@ type repositoryWidget struct {
 }
 
 func (widget *repositoryWidget) initialize() error {
-	widget.withTitle("Repository").withCacheDuration(1 * time.Hour)
+	widget.withTitle("Repository").withCacheDuration(3 * time.Hour)
+
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(3 * time.Hour)
+		widget.UpdateInterval = &interval
+	}
 
 	if widget.PullRequestsLimit == 0 || widget.PullRequestsLimit < -1 {
 		widget.PullRequestsLimit = 3

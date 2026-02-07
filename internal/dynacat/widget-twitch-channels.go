@@ -28,6 +28,11 @@ func (widget *twitchChannelsWidget) initialize() error {
 		withTitleURL("https://www.twitch.tv/directory/following").
 		withCacheDuration(time.Minute * 10)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(15 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	if widget.CollapseAfter == 0 || widget.CollapseAfter < -1 {
 		widget.CollapseAfter = 5
 	}

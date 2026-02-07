@@ -23,6 +23,11 @@ type lobstersWidget struct {
 func (widget *lobstersWidget) initialize() error {
 	widget.withTitle("Lobsters").withCacheDuration(time.Hour)
 
+	if widget.UpdateInterval == nil {
+		interval := updateIntervalField(30 * time.Minute)
+		widget.UpdateInterval = &interval
+	}
+
 	if widget.InstanceURL == "" {
 		widget.withTitleURL("https://lobste.rs")
 	} else {
