@@ -332,6 +332,9 @@ func (w *widgetBase) getNextUpdateTime() time.Time {
 	now := time.Now()
 
 	if w.cacheType == cacheTypeDuration {
+		if w.CustomCacheDuration == 0 && w.UpdateInterval != nil && *w.UpdateInterval > 0 {
+			return now.Add(time.Duration(*w.UpdateInterval))
+		}
 		return now.Add(w.cacheDuration)
 	}
 

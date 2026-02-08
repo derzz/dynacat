@@ -25,7 +25,7 @@ func (widget *serverStatsWidget) initialize() error {
 	widget.widgetBase.WIP = true
 
 	if widget.UpdateInterval == nil {
-		interval := updateIntervalField(1 * time.Millisecond)
+		interval := updateIntervalField(15 * time.Second)
 		widget.UpdateInterval = &interval
 	}
 

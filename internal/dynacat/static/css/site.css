@@ -275,6 +275,11 @@ kbd:active {
     max-height: 2.7rem;
 }
 
+.logo svg {
+    max-height: 2.7rem;
+    width: auto;
+}
+
 .nav {
     overflow-x: auto;
     min-width: 0;
