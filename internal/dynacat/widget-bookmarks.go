@@ -67,11 +67,32 @@ func (widget *bookmarksWidget) initialize() error {
 		}
 	}
 
-	widget.cachedHTML = widget.renderTemplate(widget, bookmarksWidgetTemplate)
-
 	return nil
 }
 
+func (widget *bookmarksWidget) setProviders(providers *widgetProviders) {
+	widget.widgetBase.setProviders(providers)
+	widget.cacheIcons()
+	widget.cachedHTML = widget.renderTemplate(widget, bookmarksWidgetTemplate)
+}
+
 func (widget *bookmarksWidget) Render() template.HTML {
+	if widget.cachedHTML == "" {
+		widget.cachedHTML = widget.renderTemplate(widget, bookmarksWidgetTemplate)
+	}
+
 	return widget.cachedHTML
+}
+
+func (widget *bookmarksWidget) cacheIcons() {
+	if widget.Providers == nil || widget.Providers.imageCache == nil {
+		return
+	}
+
+	for g := range widget.Groups {
+		group := &widget.Groups[g]
+		for l := range group.Links {
+			group.Links[l].Icon.cacheURL(widget.Providers.imageCache)
+		}
+	}
 }

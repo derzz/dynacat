@@ -169,6 +169,7 @@ type widgetBase struct {
 
 type widgetProviders struct {
 	assetResolver func(string) string
+	imageCache    *imageCache
 }
 
 func (w *widgetBase) requiresUpdate(now *time.Time) bool {

@@ -49,6 +49,18 @@ func (widget *monitorWidget) initialize() error {
 	return nil
 }
 
+func (widget *monitorWidget) setProviders(providers *widgetProviders) {
+	widget.widgetBase.setProviders(providers)
+
+	if widget.Providers == nil || widget.Providers.imageCache == nil {
+		return
+	}
+
+	for i := range widget.Sites {
+		widget.Sites[i].Icon.cacheURL(widget.Providers.imageCache)
+	}
+}
+
 func (widget *monitorWidget) update(ctx context.Context) {
 	requests := make([]*SiteStatusRequest, len(widget.Sites))
 

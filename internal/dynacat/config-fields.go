@@ -1,6 +1,7 @@
 package dynacat
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"html/template"
@@ -215,6 +216,24 @@ func newCustomIconField(value string) customIconField {
 	}
 
 	return field
+}
+
+func (i *customIconField) cacheURL(cache *imageCache) {
+	if cache == nil {
+		return
+	}
+
+	currentURL := strings.TrimSpace(string(i.URL))
+	if currentURL == "" {
+		return
+	}
+
+	cachedURL, err := cache.CacheURL(context.Background(), currentURL)
+	if err != nil || cachedURL == "" {
+		return
+	}
+
+	i.URL = template.URL(cachedURL)
 }
 
 func (i *customIconField) UnmarshalYAML(node *yaml.Node) error {

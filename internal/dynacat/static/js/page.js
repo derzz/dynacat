@@ -828,31 +828,38 @@ async function updateWidget(widgetElement) {
     const newWidget = await fetchWidgetContent(widgetElement);
     
     if (newWidget && widgetElement.outerHTML !== newWidget.outerHTML) {
-        // For custom-api widgets, only update the content to prevent flashing
-        const isCustomAPI = widgetElement.classList.contains('widget-type-custom-api');
+        const oldContent = widgetElement.querySelector('.widget-content');
+        const newContent = newWidget.querySelector('.widget-content');
         
-        if (isCustomAPI) {
-            const oldContent = widgetElement.querySelector('.widget-content');
-            const newContent = newWidget.querySelector('.widget-content');
+        // Check if widget has images that we should preserve
+        const hasImages = oldContent && oldContent.querySelector('img[loading="lazy"]') !== null;
+        const shouldPreserveContent = hasImages || widgetElement.classList.contains('widget-type-custom-api');
+        
+        if (shouldPreserveContent && oldContent && newContent) {
+            // Update content while preserving cached images
+            updateContentPreservingImages(oldContent, newContent);
             
-            if (oldContent && newContent && oldContent.innerHTML !== newContent.innerHTML) {
-                oldContent.innerHTML = newContent.innerHTML;
-                
-                const callbacksIndexBefore = contentReadyCallbacks.length;
+            // Update header if it changed
+            const oldHeader = widgetElement.querySelector('.widget-header');
+            const newHeader = newWidget.querySelector('.widget-header');
+            if (oldHeader && newHeader && oldHeader.innerHTML !== newHeader.innerHTML) {
+                oldHeader.innerHTML = newHeader.innerHTML;
+            }
+            
+            const callbacksIndexBefore = contentReadyCallbacks.length;
 
-                setupPopovers();
-                setupCarousels();
-                setupCollapsibleLists();
-                setupCollapsibleGrids();
-                setupGroups();
-                setupMasonries();
-                setupLazyImages();
-                setupTruncatedElementTitles();
+            setupPopovers();
+            setupCarousels();
+            setupCollapsibleLists();
+            setupCollapsibleGrids();
+            setupGroups();
+            setupMasonries();
+            setupLazyImages();
+            setupTruncatedElementTitles();
 
-                const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
-                for (const cb of newCallbacks) {
-                    cb();
-                }
+            const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
+            for (const cb of newCallbacks) {
+                cb();
             }
         } else {
             // Store the widget ID before replacement
@@ -901,6 +908,36 @@ async function updateWidget(widgetElement) {
             }
         }
     }
+}
+
+function updateContentPreservingImages(oldContent, newContent) {
+    const oldImages = Array.from(oldContent.querySelectorAll('img[loading="lazy"]'));
+    const newImages = Array.from(newContent.querySelectorAll('img[loading="lazy"]'));
+    
+    // Create a map of image src to old image elements
+    const imageMap = new Map();
+    for (const img of oldImages) {
+        imageMap.set(img.src, img);
+    }
+    
+    // Replace new images with old ones if src matches to preserve cached state
+    for (const newImg of newImages) {
+        const oldImg = imageMap.get(newImg.src);
+        if (oldImg) {
+            // Clone the old image to preserve its loaded state
+            const clonedImg = oldImg.cloneNode(true);
+            // Copy over any new attributes except src
+            for (const attr of newImg.attributes) {
+                if (attr.name !== 'src' && attr.name !== 'class') {
+                    clonedImg.setAttribute(attr.name, attr.value);
+                }
+            }
+            newImg.replaceWith(clonedImg);
+        }
+    }
+    
+    // Now update the content
+    oldContent.innerHTML = newContent.innerHTML;
 }
 
 const widgetIntervals = new Map();
@@ -968,17 +1005,25 @@ async function applyContentUpdate() {
             const tempWidget = tempWidgets[j];
 
             if (realWidget.dataset.updateInterval && realWidget.outerHTML !== tempWidget.outerHTML) {
-                const isCustomAPI = realWidget.classList.contains('widget-type-custom-api');
+                const oldContent = realWidget.querySelector('.widget-content');
+                const newContent = tempWidget.querySelector('.widget-content');
                 
-                if (isCustomAPI) {
-                    // For custom-api widgets, only update the content to prevent flashing
-                    const oldContent = realWidget.querySelector('.widget-content');
-                    const newContent = tempWidget.querySelector('.widget-content');
+                // Check if widget has images that we should preserve
+                const hasImages = oldContent && oldContent.querySelector('img[loading="lazy"]') !== null;
+                const shouldPreserveContent = hasImages || realWidget.classList.contains('widget-type-custom-api');
+                
+                if (shouldPreserveContent && oldContent && newContent) {
+                    // Update content while preserving cached images
+                    updateContentPreservingImages(oldContent, newContent);
                     
-                    if (oldContent && newContent && oldContent.innerHTML !== newContent.innerHTML) {
-                        oldContent.innerHTML = newContent.innerHTML;
-                        anyReplaced = true;
+                    // Update header if it changed
+                    const oldHeader = realWidget.querySelector('.widget-header');
+                    const newHeader = tempWidget.querySelector('.widget-header');
+                    if (oldHeader && newHeader && oldHeader.innerHTML !== newHeader.innerHTML) {
+                        oldHeader.innerHTML = newHeader.innerHTML;
                     }
+                    
+                    anyReplaced = true;
                 } else {
                     // Clear the interval for the old widget if it has one
                     if (widgetIntervals.has(realWidget)) {

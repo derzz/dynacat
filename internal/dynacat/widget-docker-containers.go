@@ -60,11 +60,22 @@ func (widget *dockerContainersWidget) update(ctx context.Context) {
 	}
 
 	containers.sortByStateIconThenTitle()
+	widget.cacheContainerIcons(containers)
 	widget.Containers = containers
 }
 
 func (widget *dockerContainersWidget) Render() template.HTML {
 	return widget.renderTemplate(widget, dockerContainersWidgetTemplate)
+}
+
+func (widget *dockerContainersWidget) cacheContainerIcons(containers dockerContainerList) {
+	if widget.Providers == nil || widget.Providers.imageCache == nil {
+		return
+	}
+
+	for i := range containers {
+		containers[i].Icon.cacheURL(widget.Providers.imageCache)
+	}
 }
 
 const (

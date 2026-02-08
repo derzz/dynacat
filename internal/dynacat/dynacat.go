@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -24,6 +25,7 @@ var (
 )
 
 const STATIC_ASSETS_CACHE_DURATION = 24 * time.Hour
+const REMOTE_IMAGE_CACHE_DURATION = 7 * 24 * time.Hour
 
 var reservedPageSlugs = []string{"login", "logout"}
 
@@ -140,6 +142,23 @@ func newApplication(c *config) (*application, error) {
 		return nil, fmt.Errorf("initializing default theme: %v", err)
 	}
 
+	config.Server.BaseURL = strings.TrimRight(config.Server.BaseURL, "/")
+	if config.Server.CacheDir == "" {
+		config.Server.CacheDir = ".cache"
+	}
+	cacheDir := config.Server.CacheDir
+	if !filepath.IsAbs(cacheDir) {
+		absCacheDir, err := filepath.Abs(cacheDir)
+		if err != nil {
+			return nil, fmt.Errorf("resolving cache-dir: %v", err)
+		}
+		cacheDir = absCacheDir
+	}
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return nil, fmt.Errorf("creating cache-dir: %v", err)
+	}
+	config.Server.CacheDir = cacheDir
+
 	//
 	// Init pages
 	//
@@ -148,6 +167,7 @@ func newApplication(c *config) (*application, error) {
 
 	providers := &widgetProviders{
 		assetResolver: app.StaticAssetPath,
+		imageCache:    newImageCache(config.Server.BaseURL, config.Server.CacheDir),
 	}
 
 	for p := range config.Pages {
@@ -193,7 +213,6 @@ func newApplication(c *config) (*application, error) {
 		}
 	}
 
-	config.Server.BaseURL = strings.TrimRight(config.Server.BaseURL, "/")
 	config.Theme.CustomCSSFile = app.resolveUserDefinedAssetPath(config.Theme.CustomCSSFile)
 	config.Branding.LogoURL = app.resolveUserDefinedAssetPath(config.Branding.LogoURL)
 
@@ -515,6 +534,16 @@ func (a *application) server() (func() error, func() error) {
 			fileServerWithCache(http.FS(staticFS), STATIC_ASSETS_CACHE_DURATION),
 		),
 	)
+
+	if a.Config.Server.CacheDir != "" {
+		mux.Handle(
+			"GET /.cache/{path...}",
+			http.StripPrefix(
+				"/.cache",
+				fileServerWithCache(http.Dir(a.Config.Server.CacheDir), REMOTE_IMAGE_CACHE_DURATION),
+			),
+		)
+	}
 
 	assetCacheControlValue := fmt.Sprintf(
 		"public, max-age=%d",

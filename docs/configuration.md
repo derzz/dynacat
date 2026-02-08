@@ -292,7 +292,8 @@ server:
 | port | number | no | 8080 |
 | proxied | boolean | no | false |
 | base-url | string | no | |
-| assets-path | string | no |  |
+| assets-path | string | no | |
+| cache-dir | string | no | .cache |
 
 #### `host`
 The address which the server will listen on. Setting it to `localhost` means that only the machine that the server is running on will be able to access the dashboard. By default it will listen on all interfaces.
@@ -345,6 +346,11 @@ To be able to point to an asset from your assets path, use the `/assets/` path l
 
 ```yaml
 icon: /assets/gitea-icon.png
+
+#### `cache-dir`
+Directory where Dynacat stores cached remote images (for example, widget icons). Cached files are served from `/.cache/` with long cache headers so browsers reuse them without refetching from the original host.
+
+If the path is relative, it will be resolved relative to the Dynacat working directory. The directory will be created if it does not exist.
 ```
 
 ## Document
