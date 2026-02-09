@@ -21,4 +21,4 @@
 | Markets | 10m |
 | Twitch Channels | 15m |
 | Twitch Top Games | 35m |
-| Currently Playing | 10s |
+| Currently Playing | 5s |

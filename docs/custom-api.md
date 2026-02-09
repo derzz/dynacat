@@ -33,6 +33,7 @@ The `update-interval` property accepts a number followed by a time unit:
 - If `update-interval` is not specified, the widget will only update when the page's global update interval triggers.
 - The `update-interval` controls client-side refresh frequency. For server-side caching, use the `cache` property.
 - Each widget with an `update-interval` polls independently, allowing different widgets to update at different rates.
+- Returning to a hidden tab does not force an immediate refresh unless the widget's `update-interval` elapsed while hidden.
 
 ### Error Handling
 
@@ -405,8 +406,6 @@ By default, the `custom-api` widget content is refreshed on the page every 1 min
   template: |
     <div>Current value: {{ .JSON.Int "value" }}</div>
 ```
-
-This will make the browser poll for new data every 5 seconds and update the widget if the content has changed.
 
 <hr>
 

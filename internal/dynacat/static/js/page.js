@@ -882,14 +882,7 @@ async function updateWidget(widgetElement) {
                 });
             }
         } else {
-            // Store the widget ID before replacement
-            const widgetId = widgetElement.id || widgetElement.dataset.widgetId;
-
-            // Clear the interval for the old widget
-            if (widgetIntervals.has(widgetElement)) {
-                clearInterval(widgetIntervals.get(widgetElement));
-                widgetIntervals.delete(widgetElement);
-            }
+            clearWidgetPollingState(widgetElement);
 
             widgetElement.replaceWith(newWidget);
 
@@ -910,22 +903,7 @@ async function updateWidget(widgetElement) {
             }
 
             // Re-setup polling for the new widget if it has an update interval
-            if (newWidget.dataset.updateInterval) {
-                const intervalMs = parseInt(newWidget.dataset.updateInterval, 10);
-                if (!isNaN(intervalMs) && intervalMs > 0) {
-                    const intervalId = setInterval(async () => {
-                        if (!document.hidden) {
-                            // Re-query the widget element to get the current version
-                            const currentWidget = newWidget.isConnected ? newWidget :
-                                document.querySelector(`.widget[data-update-interval="${intervalMs}"]`);
-                            if (currentWidget) {
-                                await updateWidget(currentWidget);
-                            }
-                        }
-                    }, intervalMs);
-                    widgetIntervals.set(newWidget, intervalId);
-                }
-            }
+            setupWidgetPolling();
 
             // Preserve scroll position after update
             if (wasAtBottom) {
@@ -975,50 +953,142 @@ function updateContentPreservingImages(oldContent, newContent) {
     oldContent.innerHTML = newContent.innerHTML;
 }
 
-const widgetIntervals = new Map();
+function nowMs() {
+    return Date.now();
+}
+
+function remainingDelayMs(intervalMs, lastRunAt) {
+    if (lastRunAt == null) {
+        return intervalMs;
+    }
+
+    const elapsed = nowMs() - lastRunAt;
+    return elapsed >= intervalMs ? 0 : intervalMs - elapsed;
+}
+
+const widgetPollingStates = new Map();
+let widgetPollingVisibilityListenerInitialized = false;
+
+function clearWidgetPollingTimeout(state) {
+    if (state.timeoutId != null) {
+        clearTimeout(state.timeoutId);
+        state.timeoutId = null;
+    }
+}
+
+function clearWidgetPollingState(widget) {
+    const state = widgetPollingStates.get(widget);
+    if (!state) {
+        return;
+    }
+
+    clearWidgetPollingTimeout(state);
+    widgetPollingStates.delete(widget);
+}
+
+function scheduleWidgetPolling(state, delayMs) {
+    clearWidgetPollingTimeout(state);
+    state.timeoutId = setTimeout(() => {
+        pollWidget(state);
+    }, Math.max(0, delayMs));
+}
+
+async function pollWidget(state) {
+    if (state.isFetching) {
+        return;
+    }
+
+    const widget = state.widget;
+
+    if (!widget.isConnected) {
+        clearWidgetPollingState(widget);
+        return;
+    }
+
+    if (document.hidden) {
+        return;
+    }
+
+    state.isFetching = true;
+    try {
+        await updateWidget(widget);
+        state.lastRunAt = nowMs();
+    } finally {
+        state.isFetching = false;
+
+        if (!document.hidden && widget.isConnected) {
+            scheduleWidgetPolling(state, state.intervalMs);
+        }
+    }
+}
+
+function registerWidgetPolling(widget, intervalMs) {
+    let state = widgetPollingStates.get(widget);
+
+    if (!state) {
+        state = {
+            widget,
+            intervalMs,
+            timeoutId: null,
+            isFetching: false,
+            lastRunAt: nowMs(),
+        };
+        widgetPollingStates.set(widget, state);
+    } else {
+        state.intervalMs = intervalMs;
+    }
+
+    if (!document.hidden) {
+        scheduleWidgetPolling(state, remainingDelayMs(state.intervalMs, state.lastRunAt));
+    }
+}
+
+function handleWidgetPollingVisibilityChange() {
+    if (document.hidden) {
+        widgetPollingStates.forEach((state) => {
+            clearWidgetPollingTimeout(state);
+        });
+        return;
+    }
+
+    widgetPollingStates.forEach((state, widget) => {
+        if (!widget.isConnected) {
+            clearWidgetPollingState(widget);
+            return;
+        }
+
+        scheduleWidgetPolling(state, remainingDelayMs(state.intervalMs, state.lastRunAt));
+    });
+}
 
 function setupWidgetPolling() {
     const pollingWidgets = document.querySelectorAll('.widget[data-update-interval]');
-    
+    const seenWidgets = new Set();
+
     pollingWidgets.forEach(widget => {
         const intervalMs = parseInt(widget.dataset.updateInterval, 10);
-        
+
         if (isNaN(intervalMs) || intervalMs <= 0) {
             console.error('Invalid update-interval for widget:', widget.dataset.updateInterval);
             return;
         }
 
-        // Clear existing interval if any
-        if (widgetIntervals.has(widget)) {
-            clearInterval(widgetIntervals.get(widget));
-        }
-
-        // Set up new interval for this widget
-        const intervalId = setInterval(async () => {
-            if (!document.hidden) {
-                // Re-query to get the current widget element
-                const currentWidget = widget.isConnected ? widget : 
-                    document.querySelector(`.widget[data-update-interval="${intervalMs}"]`);
-                if (currentWidget) {
-                    await updateWidget(currentWidget);
-                }
-            }
-        }, intervalMs);
-
-        widgetIntervals.set(widget, intervalId);
+        seenWidgets.add(widget);
+        registerWidgetPolling(widget, intervalMs);
     });
 
-    // Handle visibility changes for polling widgets
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-            // Intervals continue running but the callback checks document.hidden
-        } else {
-            // Update all widgets immediately when page becomes visible
-            widgetIntervals.forEach((intervalId, widget) => {
-                updateWidget(widget);
-            });
+    widgetPollingStates.forEach((state, widget) => {
+        if (seenWidgets.has(widget)) {
+            return;
         }
+
+        clearWidgetPollingState(widget);
     });
+
+    if (!widgetPollingVisibilityListenerInitialized) {
+        document.addEventListener("visibilitychange", handleWidgetPollingVisibilityChange);
+        widgetPollingVisibilityListenerInitialized = true;
+    }
 }
 
 async function applyContentUpdate() {
@@ -1065,11 +1135,7 @@ async function applyContentUpdate() {
 
                     anyReplaced = true;
                 } else {
-                    // Clear the interval for the old widget if it has one
-                    if (widgetIntervals.has(realWidget)) {
-                        clearInterval(widgetIntervals.get(realWidget));
-                        widgetIntervals.delete(realWidget);
-                    }
+                    clearWidgetPollingState(realWidget);
 
                     realWidget.replaceWith(tempWidget);
                     anyReplaced = true;
@@ -1117,6 +1183,20 @@ async function applyContentUpdate() {
 
 let pollingTimeout = null;
 let isPollingFetchInProgress = false;
+let pageLastPollAt = null;
+let pagePollingVisibilityListenerInitialized = false;
+
+function clearPagePollingTimeout() {
+    if (pollingTimeout != null) {
+        clearTimeout(pollingTimeout);
+        pollingTimeout = null;
+    }
+}
+
+function schedulePagePoll(poll, delayMs) {
+    clearPagePollingTimeout();
+    pollingTimeout = setTimeout(poll, Math.max(0, delayMs));
+}
 
 function startPolling() {
     if (!pageData.updateInterval || pageData.updateInterval <= 0) return;
@@ -1124,32 +1204,41 @@ function startPolling() {
     const poll = async () => {
         if (isPollingFetchInProgress) return;
 
-        if (pollingTimeout) {
-            clearTimeout(pollingTimeout);
-            pollingTimeout = null;
+        clearPagePollingTimeout();
+
+        if (document.hidden) {
+            return;
         }
 
         isPollingFetchInProgress = true;
         try {
             await applyContentUpdate();
+            pageLastPollAt = nowMs();
         } finally {
             isPollingFetchInProgress = false;
             if (!document.hidden) {
-                pollingTimeout = setTimeout(poll, pageData.updateInterval);
+                schedulePagePoll(poll, pageData.updateInterval);
             }
         }
     };
 
-    document.addEventListener("visibilitychange", () => {
+    const handlePagePollingVisibilityChange = () => {
         if (document.hidden) {
-            if (pollingTimeout) {
-                clearTimeout(pollingTimeout);
-                pollingTimeout = null;
-            }
+            clearPagePollingTimeout();
         } else {
-            poll();
+            if (pageLastPollAt == null) {
+                poll();
+                return;
+            }
+
+            schedulePagePoll(poll, remainingDelayMs(pageData.updateInterval, pageLastPollAt));
         }
-    });
+    };
+
+    if (!pagePollingVisibilityListenerInitialized) {
+        document.addEventListener("visibilitychange", handlePagePollingVisibilityChange);
+        pagePollingVisibilityListenerInitialized = true;
+    }
 
     poll();
 }

@@ -752,6 +752,8 @@ Controls how often the browser fetches new data from the server for this widget.
 
 If not specified, the widget will only update when the page's global update interval triggers (if configured) or as defined by the widget. For example, the `monitor` and `docker-containers` widgets refresh every 2 minutes by default.
 
+When the browser tab becomes visible again, Dynacat does not force an immediate refresh unless the configured interval elapsed while the tab was hidden.
+
 **Note:** This only affects how often the browser requests updated content. The server-side caching behavior is controlled separately by the `cache` property.
 
 #### `css-class`

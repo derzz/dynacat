@@ -114,7 +114,7 @@ func (widget *playingWidget) initialize() error {
 	widget.withTitle("Currently Playing")
 
 	if widget.UpdateInterval == nil {
-		interval := updateIntervalField(10 * time.Second)
+		interval := updateIntervalField(5 * time.Second)
 		widget.UpdateInterval = &interval
 	}
 
