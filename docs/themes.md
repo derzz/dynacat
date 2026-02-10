@@ -11,6 +11,24 @@ theme:
   contrast-multiplier: 1.1
 ```
 
+### Midnight Navy
+![screenshot](images/themes/midnight-navy.png)
+```yaml
+theme:
+  background-color: 222 20 7
+  primary-color: 215 50 60
+  contrast-multiplier: 1.1
+```
+
+### Camouflage
+![screenshot](images/themes/camouflage.png)
+```yaml
+theme:
+  background-color: 186 21 20
+  contrast-multiplier: 1.2
+  primary-color: 97 13 80
+```
+
 ### Catppuccin Frappe
 ![screenshot](images/themes/catppuccin-frappe.png)
 ```yaml
@@ -42,15 +60,6 @@ theme:
   primary-color: 217 92 83
   positive-color: 115 54 76
   negative-color: 347 70 65
-```
-
-### Camouflage
-![screenshot](images/themes/camouflage.png)
-```yaml
-theme:
-  background-color: 186 21 20
-  contrast-multiplier: 1.2
-  primary-color: 97 13 80
 ```
 
 ### Gruvbox Dark
@@ -149,4 +158,23 @@ theme:
   background-color: 0 0 95
   primary-color: 0 0 10
   negative-color: 0 90 50
+```
+
+### Morning Paper
+![screenshot](images/themes/morning-paper.png)
+```yaml
+theme:
+  light: true
+  background-color: 40 10 95
+  primary-color: 25 50 35
+  text-saturation-multiplier: 0.8
+```
+
+### Heather Mist
+![screenshot](images/themes/heather-mist.png)
+```yaml
+theme:
+  light: true
+  background-color: 270 12 97
+  primary-color: 270 35 50
 ```

@@ -62,7 +62,6 @@ Configuration is done through YAML files, to learn more about how the layout wor
 <br>
 
 ```yaml
-pages:
   - name: Home
     columns:
       - size: small
