@@ -825,44 +825,64 @@ async function fetchWidgetContent(widgetElement) {
 }
 
 async function updateWidget(widgetElement) {
+    // Store scroll position before update
+    const scrollThreshold = 100; // pixels from bottom to be considered "at bottom"
+    const wasAtBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - scrollThreshold);
+    const scrollBefore = window.scrollY;
+
     const newWidget = await fetchWidgetContent(widgetElement);
-    
+
     if (newWidget && widgetElement.outerHTML !== newWidget.outerHTML) {
-        // For custom-api widgets, only update the content to prevent flashing
-        const isCustomAPI = widgetElement.classList.contains('widget-type-custom-api');
-        
-        if (isCustomAPI) {
-            const oldContent = widgetElement.querySelector('.widget-content');
-            const newContent = newWidget.querySelector('.widget-content');
-            
-            if (oldContent && newContent && oldContent.innerHTML !== newContent.innerHTML) {
-                oldContent.innerHTML = newContent.innerHTML;
-                
-                const callbacksIndexBefore = contentReadyCallbacks.length;
+        const oldContent = widgetElement.querySelector('.widget-content');
+        const newContent = newWidget.querySelector('.widget-content');
 
-                setupPopovers();
-                setupCarousels();
-                setupCollapsibleLists();
-                setupCollapsibleGrids();
-                setupGroups();
-                setupMasonries();
-                setupLazyImages();
-                setupTruncatedElementTitles();
+        // Check if widget has images that we should preserve
+        const hasImages = oldContent && oldContent.querySelector('img[loading="lazy"]') !== null;
+        const shouldPreserveContent = hasImages || widgetElement.classList.contains('widget-type-custom-api');
 
-                const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
-                for (const cb of newCallbacks) {
-                    cb();
-                }
+        if (shouldPreserveContent && oldContent && newContent) {
+            // Update content while preserving cached images
+            updateContentPreservingImages(oldContent, newContent);
+
+            // Update header if it changed
+            const oldHeader = widgetElement.querySelector('.widget-header');
+            const newHeader = newWidget.querySelector('.widget-header');
+            if (oldHeader && newHeader && oldHeader.innerHTML !== newHeader.innerHTML) {
+                oldHeader.innerHTML = newHeader.innerHTML;
+            }
+
+            const callbacksIndexBefore = contentReadyCallbacks.length;
+
+            setupPopovers();
+            setupCarousels();
+            setupCollapsibleLists();
+            setupCollapsibleGrids();
+            setupGroups();
+            setupMasonries();
+            setupLazyImages();
+            setupTruncatedElementTitles();
+
+            const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
+            for (const cb of newCallbacks) {
+                cb();
+            }
+
+            // Preserve scroll position after update
+            if (wasAtBottom) {
+                // If user was at bottom, keep them at bottom
+                window.scrollTo({
+                    top: document.documentElement.scrollHeight,
+                    behavior: 'instant'
+                });
+            } else {
+                // Otherwise, restore exact scroll position to prevent jumping
+                window.scrollTo({
+                    top: scrollBefore,
+                    behavior: 'instant'
+                });
             }
         } else {
-            // Store the widget ID before replacement
-            const widgetId = widgetElement.id || widgetElement.dataset.widgetId;
-            
-            // Clear the interval for the old widget
-            if (widgetIntervals.has(widgetElement)) {
-                clearInterval(widgetIntervals.get(widgetElement));
-                widgetIntervals.delete(widgetElement);
-            }
+            clearWidgetPollingState(widgetElement);
 
             widgetElement.replaceWith(newWidget);
 
@@ -883,73 +903,200 @@ async function updateWidget(widgetElement) {
             }
 
             // Re-setup polling for the new widget if it has an update interval
-            if (newWidget.dataset.updateInterval) {
-                const intervalMs = parseInt(newWidget.dataset.updateInterval, 10);
-                if (!isNaN(intervalMs) && intervalMs > 0) {
-                    const intervalId = setInterval(async () => {
-                        if (!document.hidden) {
-                            // Re-query the widget element to get the current version
-                            const currentWidget = newWidget.isConnected ? newWidget : 
-                                document.querySelector(`.widget[data-update-interval="${intervalMs}"]`);
-                            if (currentWidget) {
-                                await updateWidget(currentWidget);
-                            }
-                        }
-                    }, intervalMs);
-                    widgetIntervals.set(newWidget, intervalId);
-                }
+            setupWidgetPolling();
+
+            // Preserve scroll position after update
+            if (wasAtBottom) {
+                // If user was at bottom, keep them at bottom
+                window.scrollTo({
+                    top: document.documentElement.scrollHeight,
+                    behavior: 'instant'
+                });
+            } else {
+                // Otherwise, restore exact scroll position to prevent jumping
+                window.scrollTo({
+                    top: scrollBefore,
+                    behavior: 'instant'
+                });
             }
         }
     }
 }
 
-const widgetIntervals = new Map();
+function updateContentPreservingImages(oldContent, newContent) {
+    const oldImages = Array.from(oldContent.querySelectorAll('img[loading="lazy"]'));
+    const newImages = Array.from(newContent.querySelectorAll('img[loading="lazy"]'));
+    
+    // Create a map of image src to old image elements
+    const imageMap = new Map();
+    for (const img of oldImages) {
+        imageMap.set(img.src, img);
+    }
+    
+    // Replace new images with old ones if src matches to preserve cached state
+    for (const newImg of newImages) {
+        const oldImg = imageMap.get(newImg.src);
+        if (oldImg) {
+            // Clone the old image to preserve its loaded state
+            const clonedImg = oldImg.cloneNode(true);
+            // Copy over any new attributes except src
+            for (const attr of newImg.attributes) {
+                if (attr.name !== 'src' && attr.name !== 'class') {
+                    clonedImg.setAttribute(attr.name, attr.value);
+                }
+            }
+            newImg.replaceWith(clonedImg);
+        }
+    }
+    
+    // Now update the content
+    oldContent.innerHTML = newContent.innerHTML;
+}
+
+function nowMs() {
+    return Date.now();
+}
+
+function remainingDelayMs(intervalMs, lastRunAt) {
+    if (lastRunAt == null) {
+        return intervalMs;
+    }
+
+    const elapsed = nowMs() - lastRunAt;
+    return elapsed >= intervalMs ? 0 : intervalMs - elapsed;
+}
+
+const widgetPollingStates = new Map();
+let widgetPollingVisibilityListenerInitialized = false;
+
+function clearWidgetPollingTimeout(state) {
+    if (state.timeoutId != null) {
+        clearTimeout(state.timeoutId);
+        state.timeoutId = null;
+    }
+}
+
+function clearWidgetPollingState(widget) {
+    const state = widgetPollingStates.get(widget);
+    if (!state) {
+        return;
+    }
+
+    clearWidgetPollingTimeout(state);
+    widgetPollingStates.delete(widget);
+}
+
+function scheduleWidgetPolling(state, delayMs) {
+    clearWidgetPollingTimeout(state);
+    state.timeoutId = setTimeout(() => {
+        pollWidget(state);
+    }, Math.max(0, delayMs));
+}
+
+async function pollWidget(state) {
+    if (state.isFetching) {
+        return;
+    }
+
+    const widget = state.widget;
+
+    if (!widget.isConnected) {
+        clearWidgetPollingState(widget);
+        return;
+    }
+
+    if (document.hidden) {
+        return;
+    }
+
+    state.isFetching = true;
+    try {
+        await updateWidget(widget);
+        state.lastRunAt = nowMs();
+    } finally {
+        state.isFetching = false;
+
+        if (!document.hidden && widget.isConnected) {
+            scheduleWidgetPolling(state, state.intervalMs);
+        }
+    }
+}
+
+function registerWidgetPolling(widget, intervalMs) {
+    let state = widgetPollingStates.get(widget);
+
+    if (!state) {
+        state = {
+            widget,
+            intervalMs,
+            timeoutId: null,
+            isFetching: false,
+            lastRunAt: nowMs(),
+        };
+        widgetPollingStates.set(widget, state);
+    } else {
+        state.intervalMs = intervalMs;
+    }
+
+    if (!document.hidden) {
+        scheduleWidgetPolling(state, remainingDelayMs(state.intervalMs, state.lastRunAt));
+    }
+}
+
+function handleWidgetPollingVisibilityChange() {
+    if (document.hidden) {
+        widgetPollingStates.forEach((state) => {
+            clearWidgetPollingTimeout(state);
+        });
+        return;
+    }
+
+    widgetPollingStates.forEach((state, widget) => {
+        if (!widget.isConnected) {
+            clearWidgetPollingState(widget);
+            return;
+        }
+
+        scheduleWidgetPolling(state, remainingDelayMs(state.intervalMs, state.lastRunAt));
+    });
+}
 
 function setupWidgetPolling() {
     const pollingWidgets = document.querySelectorAll('.widget[data-update-interval]');
-    
+    const seenWidgets = new Set();
+
     pollingWidgets.forEach(widget => {
         const intervalMs = parseInt(widget.dataset.updateInterval, 10);
-        
+
         if (isNaN(intervalMs) || intervalMs <= 0) {
             console.error('Invalid update-interval for widget:', widget.dataset.updateInterval);
             return;
         }
 
-        // Clear existing interval if any
-        if (widgetIntervals.has(widget)) {
-            clearInterval(widgetIntervals.get(widget));
-        }
-
-        // Set up new interval for this widget
-        const intervalId = setInterval(async () => {
-            if (!document.hidden) {
-                // Re-query to get the current widget element
-                const currentWidget = widget.isConnected ? widget : 
-                    document.querySelector(`.widget[data-update-interval="${intervalMs}"]`);
-                if (currentWidget) {
-                    await updateWidget(currentWidget);
-                }
-            }
-        }, intervalMs);
-
-        widgetIntervals.set(widget, intervalId);
+        seenWidgets.add(widget);
+        registerWidgetPolling(widget, intervalMs);
     });
 
-    // Handle visibility changes for polling widgets
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-            // Intervals continue running but the callback checks document.hidden
-        } else {
-            // Update all widgets immediately when page becomes visible
-            widgetIntervals.forEach((intervalId, widget) => {
-                updateWidget(widget);
-            });
+    widgetPollingStates.forEach((state, widget) => {
+        if (seenWidgets.has(widget)) {
+            return;
         }
+
+        clearWidgetPollingState(widget);
     });
+
+    if (!widgetPollingVisibilityListenerInitialized) {
+        document.addEventListener("visibilitychange", handleWidgetPollingVisibilityChange);
+        widgetPollingVisibilityListenerInitialized = true;
+    }
 }
 
 async function applyContentUpdate() {
+    // Store scroll position before update
+    const scrollThreshold = 100; // pixels from bottom to be considered "at bottom"
+    const wasAtBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - scrollThreshold);
+    const scrollBefore = window.scrollY;
+
     const pageContent = await fetchPageContent(pageData);
     const tempDiv = document.createElement("div");
     tempDiv.innerHTML = pageContent;
@@ -968,24 +1115,28 @@ async function applyContentUpdate() {
             const tempWidget = tempWidgets[j];
 
             if (realWidget.dataset.updateInterval && realWidget.outerHTML !== tempWidget.outerHTML) {
-                const isCustomAPI = realWidget.classList.contains('widget-type-custom-api');
-                
-                if (isCustomAPI) {
-                    // For custom-api widgets, only update the content to prevent flashing
-                    const oldContent = realWidget.querySelector('.widget-content');
-                    const newContent = tempWidget.querySelector('.widget-content');
-                    
-                    if (oldContent && newContent && oldContent.innerHTML !== newContent.innerHTML) {
-                        oldContent.innerHTML = newContent.innerHTML;
-                        anyReplaced = true;
+                const oldContent = realWidget.querySelector('.widget-content');
+                const newContent = tempWidget.querySelector('.widget-content');
+
+                // Check if widget has images that we should preserve
+                const hasImages = oldContent && oldContent.querySelector('img[loading="lazy"]') !== null;
+                const shouldPreserveContent = hasImages || realWidget.classList.contains('widget-type-custom-api');
+
+                if (shouldPreserveContent && oldContent && newContent) {
+                    // Update content while preserving cached images
+                    updateContentPreservingImages(oldContent, newContent);
+
+                    // Update header if it changed
+                    const oldHeader = realWidget.querySelector('.widget-header');
+                    const newHeader = tempWidget.querySelector('.widget-header');
+                    if (oldHeader && newHeader && oldHeader.innerHTML !== newHeader.innerHTML) {
+                        oldHeader.innerHTML = newHeader.innerHTML;
                     }
+
+                    anyReplaced = true;
                 } else {
-                    // Clear the interval for the old widget if it has one
-                    if (widgetIntervals.has(realWidget)) {
-                        clearInterval(widgetIntervals.get(realWidget));
-                        widgetIntervals.delete(realWidget);
-                    }
-                    
+                    clearWidgetPollingState(realWidget);
+
                     realWidget.replaceWith(tempWidget);
                     anyReplaced = true;
                 }
@@ -1012,11 +1163,40 @@ async function applyContentUpdate() {
 
         // Re-setup custom-api widget polling for any replaced widgets
         setupWidgetPolling();
+
+        // Preserve scroll position after update
+        if (wasAtBottom) {
+            // If user was at bottom, keep them at bottom
+            window.scrollTo({
+                top: document.documentElement.scrollHeight,
+                behavior: 'instant'
+            });
+        } else {
+            // Otherwise, restore exact scroll position to prevent jumping
+            window.scrollTo({
+                top: scrollBefore,
+                behavior: 'instant'
+            });
+        }
     }
 }
 
 let pollingTimeout = null;
 let isPollingFetchInProgress = false;
+let pageLastPollAt = null;
+let pagePollingVisibilityListenerInitialized = false;
+
+function clearPagePollingTimeout() {
+    if (pollingTimeout != null) {
+        clearTimeout(pollingTimeout);
+        pollingTimeout = null;
+    }
+}
+
+function schedulePagePoll(poll, delayMs) {
+    clearPagePollingTimeout();
+    pollingTimeout = setTimeout(poll, Math.max(0, delayMs));
+}
 
 function startPolling() {
     if (!pageData.updateInterval || pageData.updateInterval <= 0) return;
@@ -1024,32 +1204,41 @@ function startPolling() {
     const poll = async () => {
         if (isPollingFetchInProgress) return;
 
-        if (pollingTimeout) {
-            clearTimeout(pollingTimeout);
-            pollingTimeout = null;
+        clearPagePollingTimeout();
+
+        if (document.hidden) {
+            return;
         }
 
         isPollingFetchInProgress = true;
         try {
             await applyContentUpdate();
+            pageLastPollAt = nowMs();
         } finally {
             isPollingFetchInProgress = false;
             if (!document.hidden) {
-                pollingTimeout = setTimeout(poll, pageData.updateInterval);
+                schedulePagePoll(poll, pageData.updateInterval);
             }
         }
     };
 
-    document.addEventListener("visibilitychange", () => {
+    const handlePagePollingVisibilityChange = () => {
         if (document.hidden) {
-            if (pollingTimeout) {
-                clearTimeout(pollingTimeout);
-                pollingTimeout = null;
-            }
+            clearPagePollingTimeout();
         } else {
-            poll();
+            if (pageLastPollAt == null) {
+                poll();
+                return;
+            }
+
+            schedulePagePoll(poll, remainingDelayMs(pageData.updateInterval, pageLastPollAt));
         }
-    });
+    };
+
+    if (!pagePollingVisibilityListenerInitialized) {
+        document.addEventListener("visibilitychange", handlePagePollingVisibilityChange);
+        pagePollingVisibilityListenerInitialized = true;
+    }
 
     poll();
 }

@@ -23,6 +23,7 @@ type monitorWidget struct {
 		URL                string          `yaml:"-"`
 		ErrorURL           string          `yaml:"error-url"`
 		Title              string          `yaml:"title"`
+		Description        string          `yaml:"description"`
 		Icon               customIconField `yaml:"icon"`
 		SameTab            bool            `yaml:"same-tab"`
 		StatusText         string          `yaml:"-"`
@@ -47,6 +48,18 @@ func (widget *monitorWidget) initialize() error {
 	}
 
 	return nil
+}
+
+func (widget *monitorWidget) setProviders(providers *widgetProviders) {
+	widget.widgetBase.setProviders(providers)
+
+	if widget.Providers == nil || widget.Providers.imageCache == nil {
+		return
+	}
+
+	for i := range widget.Sites {
+		widget.Sites[i].Icon.cacheURL(widget.Providers.imageCache)
+	}
 }
 
 func (widget *monitorWidget) update(ctx context.Context) {

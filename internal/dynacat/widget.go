@@ -81,6 +81,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &serverStatsWidget{}
 	case "to-do":
 		w = &todoWidget{}
+	case "playing":
+		w = &playingWidget{}
 	default:
 		return nil, fmt.Errorf("unknown widget type: %s", widgetType)
 	}
@@ -169,6 +171,7 @@ type widgetBase struct {
 
 type widgetProviders struct {
 	assetResolver func(string) string
+	imageCache    *imageCache
 }
 
 func (w *widgetBase) requiresUpdate(now *time.Time) bool {
@@ -329,6 +332,9 @@ func (w *widgetBase) getNextUpdateTime() time.Time {
 	now := time.Now()
 
 	if w.cacheType == cacheTypeDuration {
+		if w.CustomCacheDuration == 0 && w.UpdateInterval != nil && *w.UpdateInterval > 0 {
+			return now.Add(time.Duration(*w.UpdateInterval))
+		}
 		return now.Add(w.cacheDuration)
 	}
 

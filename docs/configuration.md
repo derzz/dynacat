@@ -44,8 +44,8 @@
   - [Twitch Top Games](#twitch-top-games)
   - [iframe](#iframe)
   - [HTML](#html)
-
-
+- [External Integrations](#external-integrations)
+  - [Currently Playing](#currently-playing)
 ## Preconfigured page
 If you don't want to spend time reading through all the available configuration options and just want something to get you going quickly you can use [this `dynacat.yml` file](dynacat.yml) and make changes to it as you see fit. It will give you a page that looks like the following:
 
@@ -292,7 +292,8 @@ server:
 | port | number | no | 8080 |
 | proxied | boolean | no | false |
 | base-url | string | no | |
-| assets-path | string | no |  |
+| assets-path | string | no | |
+| cache-dir | string | no | .cache |
 
 #### `host`
 The address which the server will listen on. Setting it to `localhost` means that only the machine that the server is running on will be able to access the dashboard. By default it will listen on all interfaces.
@@ -345,6 +346,11 @@ To be able to point to an asset from your assets path, use the `/assets/` path l
 
 ```yaml
 icon: /assets/gitea-icon.png
+
+#### `cache-dir`
+Directory where Dynacat stores cached remote images (for example, widget icons). Cached files are served from `/.cache/` with long cache headers so browsers reuse them without refetching from the original host.
+
+If the path is relative, it will be resolved relative to the Dynacat working directory. The directory will be created if it does not exist.
 ```
 
 ## Document
@@ -745,6 +751,8 @@ cache: 1d    # 1 day
 Controls how often the browser fetches new data from the server for this widget. This is a client-side refresh interval that determines how frequently the widget updates in the browser. The value must be specified as a number followed by a time unit: `s` (seconds), `m` (minutes) or `h` (hours). For example: `5s`, `2m`, `1h`.
 
 If not specified, the widget will only update when the page's global update interval triggers (if configured) or as defined by the widget. For example, the `monitor` and `docker-containers` widgets refresh every 2 minutes by default.
+
+When the browser tab becomes visible again, Dynacat does not force an immediate refresh unless the configured interval elapsed while the tab was hidden.
 
 **Note:** This only affects how often the browser requests updated content. The server-side caching behavior is controlled separately by the `cache` property.
 
@@ -1970,6 +1978,7 @@ Properties for each site:
 | ---- | ---- | -------- | ------- |
 | title | string | yes | |
 | url | string | yes | |
+| description | string | no | |
 | check-url | string | no | |
 | error-url | string | no | |
 | icon | string | no | |
@@ -2969,3 +2978,106 @@ Example:
 ```
 
 Note the use of `|` after `source:`, this allows you to insert a multi-line string.
+
+# External Integrations
+
+### Currently Playing
+
+Display currently active media sessions from media servers (Plex, Jellyfin, Emby).
+
+Example:
+
+```yaml
+- type: playing
+  hosts:
+    - url: plex:https://plex.example.com
+      token: ${PLEX_TOKEN}
+    - url: jellyfin:https://jellyfin.example.com
+      token: ${JELLYFIN_API_KEY}
+  show-thumbnail: true
+  show-progress-bar: true
+  group-by-host: false
+```
+
+#### Properties
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| hosts | array | yes | |
+| small-column | boolean | no | false |
+| play-state | string | no | indicator |
+| show-thumbnail | boolean | no | true |
+| show-paused | boolean | no | false |
+| show-progress-bar | boolean | no | true |
+| show-progress-info | boolean | no | true |
+| time-format | string | no | 24h |
+| group-by-host | boolean | no | false |
+
+##### `hosts`
+
+An array of media server hosts to check for active sessions.
+
+**Important**: Each host URL must be prefixed with the server type (`plex:`, `jellyfin:`, or `emby:`). For example:
+- `plex:https://192.168.1.10:32400`
+- `jellyfin:http://jellyfin.local:8096`
+- `emby:https://emby.example.com`
+
+Properties for each host:
+
+| Name | Type | Required | Notes |
+| ---- | ---- | -------- | ----- |
+| url | string | yes | Must include server type prefix |
+| token | string | yes | API key or token for authentication |
+
+Example:
+```yaml
+hosts:
+  - url: plex:https://plex.example.com
+    token: ${PLEX_TOKEN}
+  - url: jellyfin:https://jellyfin.example.com
+    token: ${JELLYFIN_API_KEY}
+  - url: emby:https://emby.example.com
+    token: ${EMBY_API_KEY}
+```
+
+##### `small-column`
+Set to `true` if using the widget in a small-sized column.
+
+ 
+
+##### `play-state`
+How to display the play state. Options:
+- `indicator`: Pulsing dot (green for playing, gray for paused)
+- `text`: Plain text "[playing]" or "[paused]"
+
+##### `show-thumbnail`
+When `true`, displays thumbnails for the currently playing media.
+
+> [!WARNING]
+> Enabling thumbnails will expose your API keys/tokens in the HTML as they are included in image URLs. Do not enable this for public-facing or internet-exposed instances.
+##### `show-paused`
+When `true`, displays paused sessions in addition to actively playing sessions.
+
+##### `show-progress-bar`
+When `true`, displays an animated progress bar showing playback progress.
+
+##### `show-progress-info`
+When `true`, displays the estimated end time next to the progress bar. Requires `show-progress-bar` to be `true`.
+
+##### `time-format`
+Time format for displaying end times. Options:
+- `24h`: 24-hour format (e.g., "18:30")
+- `12h`: 12-hour format with AM/PM (e.g., "6:30pm")
+
+##### `group-by-host`
+When `true`, groups sessions by their media server. When `false`, displays all sessions in a unified list.
+
+#### API Access & Tokens
+
+**Plex:**
+- Requires a Plex token. Follow [this guide](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) to obtain your token.
+
+**Jellyfin:**
+- Requires an API key. Generate one in: Administration → Dashboard → API Keys
+
+**Emby:**
+- Requires an API key. Generate one in: ⚙️ (settings icon) → Advanced → API Keys
