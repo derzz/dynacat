@@ -31,6 +31,9 @@ type plexSessionsResponse struct {
 			Duration         int64  `json:"duration"`
 			ViewOffset       int64  `json:"viewOffset"`
 			Thumb            string `json:"thumb"`
+			GrandparentThumb string `json:"grandparentThumb"`
+			ParentThumb      string `json:"parentThumb"`
+			Key              string `json:"key"`
 		} `json:"Metadata"`
 	} `json:"MediaContainer"`
 }
@@ -60,14 +63,15 @@ type playingWidget struct {
 	Hosts       []PlayingHostConfig `yaml:"hosts"`
 	SmallColumn bool                `yaml:"small-column"`
 	// `compact` option removed — layouts use the default (non-compact) sizing
-	PlayState        string `yaml:"play-state"`
-	ShowThumbnail    bool   `yaml:"show-thumbnail"`
-	ShowPaused       bool   `yaml:"show-paused"`
-	ShowProgressBar  bool   `yaml:"show-progress-bar"`
-	ShowProgressInfo bool   `yaml:"show-progress-info"`
-	TimeFormat       string `yaml:"time-format"`
-	GroupByHost      bool   `yaml:"group-by-host"`
-	Debug            bool   `yaml:"debug"`
+	PlayState          string `yaml:"play-state"`
+	ShowThumbnail      bool   `yaml:"show-thumbnail"`
+	ShowPaused         bool   `yaml:"show-paused"`
+	ShowProgressBar    bool   `yaml:"show-progress-bar"`
+	ShowProgressInfo   bool   `yaml:"show-progress-info"`
+	TimeFormat         string `yaml:"time-format"`
+	GroupByHost        bool   `yaml:"group-by-host"`
+	EpisodeTitleFormat string `yaml:"episode-title-format"`
+	Debug              bool   `yaml:"debug"`
 
 	mu             sync.RWMutex              `yaml:"-"`
 	Sessions       []mediaSession            `yaml:"-"`
@@ -103,6 +107,8 @@ type mediaSession struct {
 	FormattedDuration  string
 	FormattedPosition  string
 	FormattedRemaining string
+	DisplayTitle       string
+	DisplaySubtitle    string
 }
 
 func (widget *playingWidget) initialize() error {
@@ -126,6 +132,9 @@ func (widget *playingWidget) initialize() error {
 	}
 	if widget.TimeFormat == "" {
 		widget.TimeFormat = "24h"
+	}
+	if widget.EpisodeTitleFormat == "" {
+		widget.EpisodeTitleFormat = "series"
 	}
 
 	// Boolean defaults (treat zero value as unspecified)
@@ -181,6 +190,11 @@ func (widget *playingWidget) initialize() error {
 	// Validate play-state
 	if widget.PlayState != "indicator" && widget.PlayState != "text" {
 		return fmt.Errorf("play-state must be 'indicator' or 'text'")
+	}
+
+	// Validate episode-title-format
+	if widget.EpisodeTitleFormat != "series" && widget.EpisodeTitleFormat != "episode" {
+		return fmt.Errorf("episode-title-format must be 'series' or 'episode'")
 	}
 
 	// Initialize session maps
@@ -341,12 +355,23 @@ func (widget *playingWidget) fetchPlexSessions(ctx context.Context, host *Playin
 			session.AlbumTitle = item.ParentTitle
 		}
 
-		if item.Thumb != "" && widget.ShowThumbnail {
-			session.ThumbnailURL = fmt.Sprintf("%s%s?X-Plex-Token=%s",
-				strings.TrimRight(host.BaseURL, "/"),
-				item.Thumb,
-				host.Token,
-			)
+		// Set display title and subtitle based on format preference
+		widget.setDisplayTitles(&session)
+
+		if widget.ShowThumbnail {
+			if item.Type == "episode" && item.GrandparentThumb != "" {
+				session.ThumbnailURL = fmt.Sprintf("%s%s?X-Plex-Token=%s",
+					strings.TrimRight(host.BaseURL, "/"),
+					item.GrandparentThumb,
+					host.Token,
+				)
+			} else if item.Thumb != "" {
+				session.ThumbnailURL = fmt.Sprintf("%s%s?X-Plex-Token=%s",
+					strings.TrimRight(host.BaseURL, "/"),
+					item.Thumb,
+					host.Token,
+				)
+			}
 		}
 
 		widget.calculateProgress(&session)
@@ -482,6 +507,9 @@ func (widget *playingWidget) parseJellyfinEmbySessions(host *PlayingHostConfig, 
 			session.MediaType = strings.ToLower(item.NowPlayingItem.Type)
 		}
 
+		// Set display title and subtitle based on format preference
+		widget.setDisplayTitles(&session)
+
 		if widget.ShowThumbnail && item.NowPlayingItem.Id != "" {
 			session.ThumbnailURL = fmt.Sprintf("%s/Items/%s/Images/Primary?api_key=%s",
 				strings.TrimRight(host.BaseURL, "/"),
@@ -499,6 +527,62 @@ func (widget *playingWidget) parseJellyfinEmbySessions(host *PlayingHostConfig, 
 	}
 
 	return sessions, nil
+}
+
+func (widget *playingWidget) setDisplayTitles(session *mediaSession) {
+	// Set default display titles
+	session.DisplayTitle = session.Title
+	session.DisplaySubtitle = ""
+
+	// Handle episodes based on format preference
+	if session.MediaType == "episode" {
+		if widget.EpisodeTitleFormat == "series" {
+			// New default: Show series name with S2E4 as title
+			if session.ShowTitle != "" {
+				session.DisplayTitle = session.ShowTitle
+				if session.Season != "" || session.Episode != "" {
+					if session.Season != "" {
+						session.DisplayTitle += " - S" + session.Season
+					}
+					if session.Episode != "" {
+						session.DisplayTitle += "E" + session.Episode
+					}
+				}
+			}
+			// Episode name becomes subtitle
+			session.DisplaySubtitle = session.Title
+		} else {
+			// Legacy format: episode name as title
+			session.DisplayTitle = session.Title
+			// Series info as subtitle
+			if session.ShowTitle != "" {
+				session.DisplaySubtitle = session.ShowTitle
+				if session.Season != "" || session.Episode != "" {
+					if session.Season != "" {
+						session.DisplaySubtitle += " - S" + session.Season
+					}
+					if session.Episode != "" {
+						session.DisplaySubtitle += "E" + session.Episode
+					}
+				}
+			}
+		}
+	} else if session.MediaType == "track" {
+		// Music tracks: title is track name, subtitle is artist/album
+		session.DisplayTitle = session.Title
+		if session.Artist != "" || session.AlbumTitle != "" {
+			if session.Artist != "" {
+				session.DisplaySubtitle = session.Artist
+			}
+			if session.AlbumTitle != "" {
+				if session.DisplaySubtitle != "" {
+					session.DisplaySubtitle += " - "
+				}
+				session.DisplaySubtitle += session.AlbumTitle
+			}
+		}
+	}
+	// For movies and other types, DisplayTitle and DisplaySubtitle are already set correctly
 }
 
 func (widget *playingWidget) calculateProgress(session *mediaSession) {

@@ -212,22 +212,10 @@
                                     <span>{{ $session.UserName }}</span>
                                 </div>
 
-                                <div class="playing-title">{{ $session.Title }}</div>
+                                <div class="playing-title">{{ $session.DisplayTitle }}</div>
 
-                                {{ if eq $session.MediaType "episode" }}
-                                    {{ if and $session.ShowTitle (or $session.Season $session.Episode) }}
-                                        <div class="playing-subtitle">
-                                            {{ $session.ShowTitle }}{{ if $session.Season }} - S{{ $session.Season }}{{ end }}{{ if $session.Episode }}E{{ $session.Episode }}{{ end }}
-                                        </div>
-                                    {{ else if $session.ShowTitle }}
-                                        <div class="playing-subtitle">{{ $session.ShowTitle }}</div>
-                                    {{ end }}
-                                {{ else if eq $session.MediaType "track" }}
-                                    {{ if or $session.Artist $session.AlbumTitle }}
-                                        <div class="playing-subtitle">
-                                            {{ if $session.Artist }}{{ $session.Artist }}{{ end }}{{ if and $session.Artist $session.AlbumTitle }} - {{ end }}{{ if $session.AlbumTitle }}{{ $session.AlbumTitle }}{{ end }}
-                                        </div>
-                                    {{ end }}
+                                {{ if $session.DisplaySubtitle }}
+                                    <div class="playing-subtitle">{{ $session.DisplaySubtitle }}</div>
                                 {{ end }}
 
                                 {{ if and $.ShowProgressBar $session.IsPlaying (gt $session.Duration 0) }}
@@ -275,22 +263,10 @@
                     <span>{{ $session.UserName }}</span>
                 </div>
 
-                <div class="playing-title">{{ $session.Title }}</div>
+                <div class="playing-title">{{ $session.DisplayTitle }}</div>
 
-                {{ if eq $session.MediaType "episode" }}
-                    {{ if and $session.ShowTitle (or $session.Season $session.Episode) }}
-                        <div class="playing-subtitle">
-                            {{ $session.ShowTitle }}{{ if $session.Season }} - S{{ $session.Season }}{{ end }}{{ if $session.Episode }}E{{ $session.Episode }}{{ end }}
-                        </div>
-                    {{ else if $session.ShowTitle }}
-                        <div class="playing-subtitle">{{ $session.ShowTitle }}</div>
-                    {{ end }}
-                {{ else if eq $session.MediaType "track" }}
-                    {{ if or $session.Artist $session.AlbumTitle }}
-                        <div class="playing-subtitle">
-                            {{ if $session.Artist }}{{ $session.Artist }}{{ end }}{{ if and $session.Artist $session.AlbumTitle }} - {{ end }}{{ if $session.AlbumTitle }}{{ $session.AlbumTitle }}{{ end }}
-                        </div>
-                    {{ end }}
+                {{ if $session.DisplaySubtitle }}
+                    <div class="playing-subtitle">{{ $session.DisplaySubtitle }}</div>
                 {{ end }}
 
                 {{ if and $.ShowProgressBar $session.IsPlaying (gt $session.Duration 0) }}

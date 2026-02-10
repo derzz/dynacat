@@ -3011,6 +3011,7 @@ Example:
 | show-progress-info | boolean | no | true |
 | time-format | string | no | 24h |
 | group-by-host | boolean | no | false |
+| episode-title-format | string | no | series |
 
 ##### `hosts`
 
@@ -3066,6 +3067,21 @@ When `true`, displays the estimated end time next to the progress bar. Requires 
 ##### `time-format`
 Time format for displaying end times. Options:
 - `24h`: 24-hour format (e.g., "18:30")
+
+##### `episode-title-format`
+Controls how episode titles are displayed for episodic media. Options:
+- `series`: (default) Shows the series name with season/episode as the main title (for example: "Arcane - S2E4") and the episode name as a smaller subtitle below.
+- `episode`: shows the episode name as the main title and the series + SxEx as the subtitle.
+
+Example:
+
+```yaml
+- type: playing
+  hosts:
+    - url: plex:https://plex.example.com
+      token: ${PLEX_TOKEN}
+  episode-title-format: series
+```
 - `12h`: 12-hour format with AM/PM (e.g., "6:30pm")
 
 ##### `group-by-host`
