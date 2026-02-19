@@ -28,7 +28,7 @@ func newWidget(widgetType string) (widget, error) {
 	case "calendar":
 		w = &calendarWidget{}
 	case "calendar-legacy":
-		w = &oldCalendarWidget{}
+		return nil, errors.New("legacy calendar has been removed")
 	case "clock":
 		w = &clockWidget{}
 	case "weather":

@@ -36,7 +36,6 @@
   - [Repository](#repository)
   - [Bookmarks](#bookmarks)
   - [Calendar](#calendar)
-  - [Calendar (legacy)](#calendar-legacy)
   - [ChangeDetection.io](#changedetectionio)
   - [Clock](#clock)
   - [Markets](#markets)
@@ -294,6 +293,7 @@ server:
 | base-url | string | no | |
 | assets-path | string | no | |
 | cache-dir | string | no | .cache |
+| db-path | string | no | /app/assets/dynacat.db |
 
 #### `host`
 The address which the server will listen on. Setting it to `localhost` means that only the machine that the server is running on will be able to access the dashboard. By default it will listen on all interfaces.
@@ -352,6 +352,9 @@ Directory where Dynacat stores cached remote images (for example, widget icons).
 
 If the path is relative, it will be resolved relative to the Dynacat working directory. The directory will be created if it does not exist.
 ```
+
+#### `db-path`
+Path to the SQLite database file used for server-side todo storage. Only required when at least one `to-do` widget has `storage: server` set. If the path is relative, it will be resolved relative to the Dynacat working directory. The file will be created if it does not exist.
 
 ## Document
 If you want to insert custom HTML into the `<head>` of the document for all pages, you can do so by using the `document` property. Example:
@@ -1882,7 +1885,7 @@ Greenville, United States
 
 ### Todo
 
-A simple to-do list that allows you to add, edit and delete tasks. The tasks are stored in the browser's local storage.
+A simple to-do list that allows you to add, edit and delete tasks. By default, tasks are stored in the browser's local storage. Optionally, tasks can be stored in a server-side SQLite database for persistence across browsers and devices.
 
 Example:
 
@@ -1905,10 +1908,34 @@ To delete a task, hover over it and click on the trash icon.
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
 | id | string | no | |
+| storage | string | no | local |
 
 ##### `id`
 
-The ID of the todo list. If you want to have multiple todo lists, you must specify a different ID for each one. The ID is used to store the tasks in the browser's local storage. This means that if you have multiple todo lists with the same ID, they will share the same tasks.
+The ID of the todo list. If you want to have multiple todo lists, you must specify a different ID for each one. The ID is used to identify tasks in the chosen storage backend. Multiple todo lists with the same ID will share the same tasks.
+
+##### `storage`
+
+Controls where tasks are persisted. Accepted values:
+
+- `local` (default) — tasks are stored in the browser's localStorage, same as before. No server-side setup required.
+- `server` — tasks are stored in a SQLite database on the server. Tasks persist across browsers and server restarts. Requires `server.db-path` to be set (or uses the default `/app/assets/dynacat.db`).
+
+Example with server storage:
+
+```yaml
+server:
+  db-path: /data/dynacat.db
+
+pages:
+  - name: Home
+    columns:
+      - size: full
+        widgets:
+          - type: to-do
+            id: my-list
+            storage: server
+```
 
 #### Keyboard shortcuts
 | Keys | Action | Condition |
@@ -2758,37 +2785,6 @@ Preview:
 
 ##### `first-day-of-week`
 The day of the week that the calendar starts on. All week days are available as possible values.
-
-### Calendar (legacy)
-Display a calendar.
-
-Example:
-
-```yaml
-- type: calendar-legacy
-  start-sunday: false
-```
-
-Preview:
-
-![](images/calendar-legacy-widget-preview.png)
-
-> [!NOTE]
->
-> This widget is deprecated and may be removed in a future version.
-
-#### Properties
-
-| Name | Type | Required | Default |
-| ---- | ---- | -------- | ------- |
-| start-sunday | boolean | no | false |
-
-##### `start-sunday`
-Whether calendar weeks start on Sunday or Monday.
-
-> [!NOTE]
->
-> There is currently little customizability available for the calendar. Extra features will be added in the future.
 
 ### Markets
 Display a list of markets, their current value, change for the day and a small 21d chart. Data is taken from Yahoo Finance.

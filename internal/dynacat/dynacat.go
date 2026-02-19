@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -45,6 +47,8 @@ type application struct {
 	usernameHashToUsername map[string]string
 	authAttemptsMu         sync.Mutex
 	failedAuthAttempts     map[string]*failedAuthAttempt
+
+	todoStorage *todoStorage
 }
 
 func newApplication(c *config) (*application, error) {
@@ -249,6 +253,42 @@ func newApplication(c *config) (*application, error) {
 		return nil, fmt.Errorf("parsing manifest.json: %v", err)
 	}
 	app.parsedManifest = []byte(manifest)
+
+	//
+	// Init todo storage
+	//
+
+	needsTodoDB := false
+	for p := range config.Pages {
+		for _, w := range config.Pages[p].HeadWidgets {
+			if tw, ok := w.(*todoWidget); ok && tw.Storage == "server" {
+				needsTodoDB = true
+				break
+			}
+		}
+		if needsTodoDB {
+			break
+		}
+		for c := range config.Pages[p].Columns {
+			for _, w := range config.Pages[p].Columns[c].Widgets {
+				if tw, ok := w.(*todoWidget); ok && tw.Storage == "server" {
+					needsTodoDB = true
+					break
+				}
+			}
+			if needsTodoDB {
+				break
+			}
+		}
+	}
+
+	if needsTodoDB {
+		dbPath := config.Server.DBPath
+		if dbPath == "" {
+			dbPath = "/app/assets/dynacat.db"
+		}
+		app.todoStorage = newTodoStorage(dbPath)
+	}
 
 	return app, nil
 }
@@ -519,6 +559,49 @@ func (a *application) VersionedAssetPath(asset string) string {
 		"?v=" + strconv.FormatInt(a.CreatedAt.Unix(), 10)
 }
 
+func (a *application) handleTodoLoad(w http.ResponseWriter, r *http.Request) {
+	if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
+		return
+	}
+
+	listID := r.PathValue("listID")
+	tasks, err := a.todoStorage.loadTasks(listID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tasks)
+}
+
+func (a *application) handleTodoSave(w http.ResponseWriter, r *http.Request) {
+	if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
+		return
+	}
+
+	listID := r.PathValue("listID")
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "reading body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var tasks []todoTask
+	if err := json.Unmarshal(body, &tasks); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := a.todoStorage.saveTasks(listID, tasks); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (a *application) server() (func() error, func() error) {
 	mux := http.NewServeMux()
 
@@ -540,6 +623,11 @@ func (a *application) server() (func() error, func() error) {
 		mux.HandleFunc("GET /login", a.handleLoginPageRequest)
 		mux.HandleFunc("GET /logout", a.handleLogoutRequest)
 		mux.HandleFunc("POST /api/authenticate", a.handleAuthenticationAttempt)
+	}
+
+	if a.todoStorage != nil {
+		mux.HandleFunc("GET /api/todo/{listID}", a.handleTodoLoad)
+		mux.HandleFunc("PUT /api/todo/{listID}", a.handleTodoSave)
 	}
 
 	mux.Handle(

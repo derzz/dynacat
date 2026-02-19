@@ -35,6 +35,7 @@ type config struct {
 		AssetsPath string `yaml:"assets-path"`
 		CacheDir   string `yaml:"cache-dir"`
 		BaseURL    string `yaml:"base-url"`
+		DBPath     string `yaml:"db-path"`
 	} `yaml:"server"`
 
 	Auth struct {
