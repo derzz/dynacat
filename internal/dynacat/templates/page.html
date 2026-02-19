@@ -8,7 +8,9 @@
 
 {{ define "navigation-links" }}
 {{ range .App.Config.Pages }}
+{{ if not .HideFromNavigation }}
 <a href="{{ $.App.Config.Server.BaseURL }}/{{ .Slug }}" class="nav-item{{ if eq .Slug $.Page.Slug }} nav-item-current{{ end }}"{{ if eq .Slug $.Page.Slug }} aria-current="page"{{ end }}>{{ .Title }}</a>
+{{ end }}
 {{ end }}
 {{ end }}
 

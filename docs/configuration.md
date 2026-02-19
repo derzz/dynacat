@@ -560,6 +560,7 @@ pages:
 | desktop-navigation-width | string | no | |
 | center-vertically | boolean | no | false |
 | hide-desktop-navigation | boolean | no | false |
+| hide-from-navigation | boolean | no | false |
 | show-mobile-header | boolean | no | false |
 | head-widgets | array | no | |
 | columns | array | yes | |
@@ -591,6 +592,9 @@ When set to `true`, vertically centers the content on the page. Has no effect if
 
 #### `hide-desktop-navigation`
 Whether to show the navigation links at the top of the page on desktop.
+
+#### `hide-from-navigation`
+Whether the page should be omitted from both the desktop and mobile navigation menus. When `true`, the page remains accessible via its slug (or links you place elsewhere) but does not appear in the navigation bar or the mobile navigation drawer.
 
 #### `show-mobile-header`
 Whether to show a header displaying the name of the page on mobile. The header purposefully has a lot of vertical whitespace in order to push the content down and make it easier to reach on tall devices.
