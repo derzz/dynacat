@@ -3,7 +3,7 @@
 <p align="center">
   <a href="#installation">Install</a> •
   <a href="docs/configuration.md#configuring-dynacat">Configuration</a> •
-  <a href="https://discord.gg/mUqTzrfjFP">Discord</a> •
+  <a href="https://discord.gg/mUqTzrfjFP">Discord</a>
 </p>
 <p align="center">
   <a href="https://github.com/glanceapp/community-widgets">Glance Community widgets</a> •
@@ -62,7 +62,6 @@ Configuration is done through YAML files, to learn more about how the layout wor
 <br>
 
 ```yaml
-pages:
   - name: Home
     columns:
       - size: small

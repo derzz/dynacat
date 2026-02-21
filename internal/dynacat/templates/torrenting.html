@@ -1,0 +1,115 @@
+{{ template "widget-base.html" . }}
+
+{{ define "widget-content" }}
+<style>
+    .torrenting-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        margin: 0;
+        padding: 0.4rem 0;
+        list-style: none;
+        border-radius: 1rem;
+    }
+
+    .torrenting-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        padding: 0.85rem 1rem;
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .torrenting-item + .torrenting-item {
+        border-top: 1px solid var(--color-separator);
+    }
+
+    .torrenting-title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+        font-size: 1rem;
+        line-height: 1.35;
+    }
+
+    .torrenting-icon {
+        flex-shrink: 0;
+        font-size: 1.25rem;
+        color: var(--color-primary);
+        width: 1.4em;
+        text-align: center;
+    }
+
+    .torrenting-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--color-highlight);
+        font-size: 1.25rem;
+        min-width: 0;
+    }
+
+    .torrenting-name.wrap {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        word-break: break-word;
+    }
+
+    .torrenting-bar {
+        height: 6px;
+        background: var(--color-separator);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 6px;
+    }
+
+    .torrenting-fill {
+        height: 100%;
+        background: var(--color-primary);
+        border-radius: 3px;
+    }
+
+    .torrenting-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 1.1rem;
+        color: var(--color-subtext);
+        margin-top: 4px;
+    }
+
+    .torrenting-empty {
+        color: var(--color-subtext);
+        font-size: 1.2rem;
+        padding: 0.5rem 0;
+    }
+</style>
+
+{{ if eq (len .Torrents) 0 }}
+    <div class="torrenting-empty">No torrents.</div>
+{{ else }}
+<ul class="list collapsible-container torrenting-list" data-collapse-after="{{ .CollapseAfter }}">
+{{ range .Torrents }}
+    {{ if and $.HideCompleted .IsCompleted }}{{ continue }}{{ end }}
+    {{ if and $.HideInactive (not .IsActive) }}{{ continue }}{{ end }}
+    <li class="torrenting-item">
+        <div class="torrenting-title-row">
+            <span class="torrenting-icon">{{ .Icon }}</span>
+            <span class="torrenting-name{{ if $.WrapText }} wrap{{ end }}" title="{{ .Name }}">{{ if $.WrapText }}{{ .Name }}{{ else }}{{ .ShortName }}{{ end }}</span>
+        </div>
+        {{ if and (not $.HideBar) (not .IsCompleted) }}
+        <div class="torrenting-bar">
+            <div class="torrenting-fill" style="width: {{ .ProgressWidth | safeCSS }}"></div>
+        </div>
+        <div class="torrenting-meta">
+            <span>{{ .FmtProgress }}</span>
+            <span>{{ .FmtETA }}</span>
+        </div>
+        {{ end }}
+    </li>
+{{ end }}
+</ul>
+{{ end }}
+{{ end }}

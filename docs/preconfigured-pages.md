@@ -20,6 +20,7 @@ Pull requests with your page configurations are welcome!
   width: slim
   hide-desktop-navigation: true
   center-vertically: true
+  hide-from-navigation: true
   columns:
     - size: full
       widgets:

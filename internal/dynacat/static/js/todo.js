@@ -8,7 +8,7 @@ const trashIconSvg = `<svg fill="currentColor" xmlns="http://www.w3.org/2000/svg
 
 export default function(element) {
     element.swapWith(
-        Todo(element.dataset.todoId)
+        Todo(element.dataset.todoId, element.dataset.todoStorage)
     )
 }
 
@@ -43,6 +43,19 @@ function loadFromLocalStorage(id) {
 
 function saveToLocalStorage(id, data) {
     localStorage.setItem(`todo-${id}`, JSON.stringify(data));
+}
+
+async function loadFromServer(id) {
+    const res = await fetch(`/api/todo/${encodeURIComponent(id)}`);
+    return res.ok ? res.json() : [];
+}
+
+async function saveToServer(id, data) {
+    await fetch(`/api/todo/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
 }
 
 function Item(unserialize = {}, onUpdate, onDelete, onEscape, onDragStart) {
@@ -101,7 +114,8 @@ function Item(unserialize = {}, onUpdate, onDelete, onEscape, onDragStart) {
     });
 }
 
-function Todo(id) {
+function Todo(id, storageType) {
+    const useServer = storageType === "server";
     let items, input, inputArea, inputContainer, lastAddedItem;
     let queuedForRemoval = 0;
     let reorderable;
@@ -116,9 +130,12 @@ function Todo(id) {
     const saveItems = () => {
         if (isDragging) return;
 
-        saveToLocalStorage(
-            id, items.children.map(item => item.component.serialize())
-        );
+        const data = items.children.map(item => item.component.serialize());
+        if (useServer) {
+            saveToServer(id, data);
+        } else {
+            saveToLocalStorage(id, data);
+        }
     };
 
     const onItemRepositioned = () => saveItems();
@@ -179,11 +196,22 @@ function Todo(id) {
         }
     };
 
+    const initialData = useServer ? [] : loadFromLocalStorage(id);
+
     items = elem()
         .classes("todo-items")
         .append(
-            ...loadFromLocalStorage(id).map(data => newItem(data))
+            ...initialData.map(data => newItem(data))
         );
+
+    if (useServer) {
+        loadFromServer(id).then(data => {
+            items.append(...data.map(d => newItem(d)));
+            if (data.length > 0) {
+                inputContainer.classes("margin-bottom-15");
+            }
+        });
+    }
 
     return fragment().append(
         inputContainer = elem()

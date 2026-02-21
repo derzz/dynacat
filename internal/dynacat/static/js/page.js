@@ -776,6 +776,7 @@ async function setupPage() {
         setupMasonries();
         setupDynamicRelativeTime();
         setupLazyImages();
+        setupPlayingProgressUpdater();
     } finally {
         pageElement.classList.add("content-ready");
         pageElement.setAttribute("aria-busy", "false");
@@ -795,40 +796,35 @@ async function setupPage() {
 }
 
 async function fetchWidgetContent(widgetElement) {
-    const widgetType = Array.from(widgetElement.classList).find(cls => cls.startsWith('widget-type-'));
-    if (!widgetType) return null;
-
-    try {
-        const pageContent = await fetchPageContent(pageData);
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = pageContent;
-
-        // Find the matching widget in the fetched content
-        const realContainers = Array.from(document.querySelectorAll(".head-widgets, .page-column"));
-        const tempContainers = Array.from(tempDiv.querySelectorAll(".head-widgets, .page-column"));
-
-        for (let i = 0; i < Math.min(realContainers.length, tempContainers.length); i++) {
-            const realWidgets = Array.from(realContainers[i].children);
-            const tempWidgets = Array.from(tempContainers[i].children);
-
-            for (let j = 0; j < Math.min(realWidgets.length, tempWidgets.length); j++) {
-                if (realWidgets[j] === widgetElement) {
-                    return tempWidgets[j];
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Failed to fetch widget content:', error);
+    const widgetId = widgetElement.dataset.widgetId;
+    if (!widgetId) {
+        return null;
     }
 
-    return null;
+    try {
+        const response = await fetch(`${pageData.baseURL}/api/widgets/${widgetId}/content/`);
+        if (!response.ok) {
+            throw new Error(`Widget content request failed (${response.status})`);
+        }
+
+        const widgetHtml = await response.text();
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = widgetHtml;
+
+        return tempDiv.querySelector(`.widget[data-widget-id="${widgetId}"]`);
+    } catch (error) {
+        console.error('Failed to fetch widget content:', error);
+        return null;
+    }
 }
 
 async function updateWidget(widgetElement) {
+    setupUserScrollIntentTracking();
+
     // Store scroll position before update
+    const refreshStartedAt = nowMs();
     const scrollThreshold = 100; // pixels from bottom to be considered "at bottom"
     const wasAtBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - scrollThreshold);
-    const scrollBefore = window.scrollY;
 
     const newWidget = await fetchWidgetContent(widgetElement);
 
@@ -867,20 +863,11 @@ async function updateWidget(widgetElement) {
                 cb();
             }
 
-            // Preserve scroll position after update
-            if (wasAtBottom) {
-                // If user was at bottom, keep them at bottom
-                window.scrollTo({
-                    top: document.documentElement.scrollHeight,
-                    behavior: 'instant'
-                });
-            } else {
-                // Otherwise, restore exact scroll position to prevent jumping
-                window.scrollTo({
-                    top: scrollBefore,
-                    behavior: 'instant'
-                });
-            }
+            // Update any local playing progress updaters and thumbnail cropping after content changes
+            setupPlayingProgressUpdater();
+            setupPlayingThumbnailCropping();
+
+            restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt);
         } else {
             clearWidgetPollingState(widgetElement);
 
@@ -904,21 +891,10 @@ async function updateWidget(widgetElement) {
 
             // Re-setup polling for the new widget if it has an update interval
             setupWidgetPolling();
+            setupPlayingProgressUpdater();
+            setupPlayingThumbnailCropping();
 
-            // Preserve scroll position after update
-            if (wasAtBottom) {
-                // If user was at bottom, keep them at bottom
-                window.scrollTo({
-                    top: document.documentElement.scrollHeight,
-                    behavior: 'instant'
-                });
-            } else {
-                // Otherwise, restore exact scroll position to prevent jumping
-                window.scrollTo({
-                    top: scrollBefore,
-                    behavior: 'instant'
-                });
-            }
+            restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt);
         }
     }
 }
@@ -957,6 +933,69 @@ function nowMs() {
     return Date.now();
 }
 
+let userScrollIntentTrackingInitialized = false;
+let lastUserScrollIntentAt = 0;
+let pendingScrollRestoreFrameId = null;
+
+function setupUserScrollIntentTracking() {
+    if (userScrollIntentTrackingInitialized) {
+        return;
+    }
+
+    const markUserScrollIntent = (event) => {
+        if (event.type === "keydown") {
+            const key = event.key;
+            if (key !== "ArrowUp" && key !== "ArrowDown" && key !== "PageUp" && key !== "PageDown" && key !== "Home" && key !== "End" && key !== " ") {
+                return;
+            }
+        }
+
+        lastUserScrollIntentAt = nowMs();
+
+        // Cancel any pending scroll restoration
+        if (pendingScrollRestoreFrameId !== null) {
+            cancelAnimationFrame(pendingScrollRestoreFrameId);
+            pendingScrollRestoreFrameId = null;
+        }
+    };
+
+    window.addEventListener("wheel", markUserScrollIntent, { passive: true });
+    window.addEventListener("touchmove", markUserScrollIntent, { passive: true });
+    window.addEventListener("keydown", markUserScrollIntent, { passive: true });
+
+    userScrollIntentTrackingInitialized = true;
+}
+
+function restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt) {
+    if (!wasAtBottom) {
+        return;
+    }
+
+    // If user scrolled recently (within last 2 seconds), respect their intent
+    const recentScrollThresholdMs = 2000;
+    const shouldSkipRestore = () => {
+        const timeSinceLastScroll = nowMs() - lastUserScrollIntentAt;
+        return timeSinceLastScroll < recentScrollThresholdMs;
+    };
+
+    const restore = () => {
+        if (shouldSkipRestore()) {
+            pendingScrollRestoreFrameId = null;
+            return;
+        }
+
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+        pendingScrollRestoreFrameId = null;
+    };
+
+    // Run immediately and once more on the next frame to absorb layout shifts.
+    restore();
+
+    if (!shouldSkipRestore()) {
+        pendingScrollRestoreFrameId = requestAnimationFrame(restore);
+    }
+}
+
 function remainingDelayMs(intervalMs, lastRunAt) {
     if (lastRunAt == null) {
         return intervalMs;
@@ -968,6 +1007,163 @@ function remainingDelayMs(intervalMs, lastRunAt) {
 
 const widgetPollingStates = new Map();
 let widgetPollingVisibilityListenerInitialized = false;
+
+// Local playing progress updaters keyed by widget element
+const playingUpdaters = new Map();
+
+function clearPlayingUpdater(widget) {
+    const state = playingUpdaters.get(widget);
+    if (!state) return;
+    if (state.intervalId != null) {
+        clearInterval(state.intervalId);
+    }
+    playingUpdaters.delete(widget);
+}
+
+function formatDurationMs(ms) {
+    ms = Math.max(0, Math.floor(ms));
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours >= 1) {
+        return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+// Wall-clock state for each session, keyed by data-session-key.
+// Survives DOM replacements so the clock never jumps on a widget refresh.
+const playingSessionStates = new Map();
+
+function _playingEstimate(state) {
+    if (!state.isPlaying) return state.anchorOffset;
+    return state.anchorOffset + (Date.now() - state.anchorTime);
+}
+
+function _playingRender(sess, offsetMs, durationMs) {
+    const pct = durationMs > 0 ? Math.min(100, (offsetMs / durationMs) * 100) : 0;
+    const fill = sess.querySelector('.playing-progress-fill');
+    if (fill) fill.style.width = pct + '%';
+    sess.querySelectorAll('.playing-time-pos').forEach(el => {
+        el.textContent = formatDurationMs(offsetMs);
+    });
+}
+
+// Called on every setupPlayingProgressUpdater invocation (initial load + after each widget refresh).
+// Re-anchors the clock only when the server reports a meaningful change.
+function _playingSyncWidget(widget) {
+    const DRIFT_TOLERANCE_MS = 3000;
+    const sessions = widget.querySelectorAll('.playing-session[data-duration][data-offset]');
+    sessions.forEach((sess, idx) => {
+        const duration = Number(sess.dataset.duration || 0);
+        if (!duration) return;
+
+        const serverOffset = Number(sess.dataset.offset || 0);
+        const isPlaying = sess.dataset.playing === 'true';
+        // Use session-key when available; fall back to widget-id + position index.
+        const key = sess.dataset.sessionKey || (widget.dataset.widgetId + ':' + idx);
+
+        let state = playingSessionStates.get(key);
+        if (state) {
+            const estimated = _playingEstimate(state);
+            const drift = Math.abs(serverOffset - estimated);
+            const stateChanged = state.isPlaying !== isPlaying;
+            if (stateChanged || drift > DRIFT_TOLERANCE_MS) {
+                // Playback state flipped or we drifted too far — re-anchor to server value.
+                state.anchorOffset = serverOffset;
+                state.anchorTime = Date.now();
+                state.isPlaying = isPlaying;
+            }
+            // else: clock is running fine, leave it alone (no jump).
+        } else {
+            state = { anchorOffset: serverOffset, anchorTime: Date.now(), isPlaying };
+            playingSessionStates.set(key, state);
+        }
+
+        _playingRender(sess, Math.min(_playingEstimate(state), duration), duration);
+    });
+}
+
+// Called every second by the per-widget interval.
+function _playingTickWidget(widget) {
+    const sessions = widget.querySelectorAll('.playing-session[data-duration][data-offset]');
+    sessions.forEach((sess, idx) => {
+        const duration = Number(sess.dataset.duration || 0);
+        if (!duration) return;
+        const key = sess.dataset.sessionKey || (widget.dataset.widgetId + ':' + idx);
+        const state = playingSessionStates.get(key);
+        if (!state) return;
+        _playingRender(sess, Math.min(_playingEstimate(state), duration), duration);
+    });
+}
+
+function setupPlayingProgressUpdater() {
+    const widgets = document.querySelectorAll('.widget[data-update-interval]');
+    const seen = new Set();
+
+    widgets.forEach(widget => {
+        seen.add(widget);
+
+        // Always sync so that paused/resumed/seeked state is picked up from the latest DOM.
+        _playingSyncWidget(widget);
+
+        if (playingUpdaters.has(widget)) return;
+
+        // First time seeing this widget element — start the 1 s tick.
+        const intervalId = setInterval(() => _playingTickWidget(widget), 1000);
+        playingUpdaters.set(widget, { intervalId });
+    });
+
+    // Tear down intervals for widget elements that are no longer in the DOM.
+    Array.from(playingUpdaters.keys()).forEach(widget => {
+        if (!seen.has(widget)) clearPlayingUpdater(widget);
+    });
+
+    setupPlayingThumbnailCropping();
+}
+
+function setupPlayingThumbnailCropping() {
+    const imgs = document.querySelectorAll('.playing-thumbnail-img');
+
+    imgs.forEach(img => {
+        const container = img.closest('.playing-thumbnail');
+        const apply = () => {
+            // Guard in case image has no natural sizes
+            if (!img.naturalWidth || !img.naturalHeight) {
+                // keep default (contain)
+                img.classList.remove('playing-crop');
+                if (container) container.classList.remove('playing-portrait');
+                return;
+            }
+
+            if (img.naturalWidth > img.naturalHeight) {
+                img.classList.add('playing-crop');
+                if (container) container.classList.remove('playing-portrait');
+            } else if (img.naturalHeight > img.naturalWidth) {
+                // portrait: make container taller and remove background
+                img.classList.remove('playing-crop');
+                if (container) container.classList.add('playing-portrait');
+            } else {
+                // square
+                img.classList.remove('playing-crop');
+                if (container) container.classList.remove('playing-portrait');
+            }
+        };
+
+        if (img.complete) {
+            apply();
+        } else {
+            img.addEventListener('load', apply, { once: true });
+            img.addEventListener('error', () => {
+                img.classList.remove('playing-crop');
+                if (container) container.classList.remove('playing-portrait');
+            }, { once: true });
+        }
+    });
+}
 
 function clearWidgetPollingTimeout(state) {
     if (state.timeoutId != null) {
@@ -1092,10 +1288,12 @@ function setupWidgetPolling() {
 }
 
 async function applyContentUpdate() {
+    setupUserScrollIntentTracking();
+
     // Store scroll position before update
+    const refreshStartedAt = nowMs();
     const scrollThreshold = 100; // pixels from bottom to be considered "at bottom"
     const wasAtBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - scrollThreshold);
-    const scrollBefore = window.scrollY;
 
     const pageContent = await fetchPageContent(pageData);
     const tempDiv = document.createElement("div");
@@ -1155,6 +1353,7 @@ async function applyContentUpdate() {
         setupMasonries();
         setupLazyImages();
         setupTruncatedElementTitles();
+        setupPlayingThumbnailCropping();
 
         const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
         for (const cb of newCallbacks) {
@@ -1163,21 +1362,9 @@ async function applyContentUpdate() {
 
         // Re-setup custom-api widget polling for any replaced widgets
         setupWidgetPolling();
+        setupPlayingProgressUpdater();
 
-        // Preserve scroll position after update
-        if (wasAtBottom) {
-            // If user was at bottom, keep them at bottom
-            window.scrollTo({
-                top: document.documentElement.scrollHeight,
-                behavior: 'instant'
-            });
-        } else {
-            // Otherwise, restore exact scroll position to prevent jumping
-            window.scrollTo({
-                top: scrollBefore,
-                behavior: 'instant'
-            });
-        }
+        restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt);
     }
 }
 

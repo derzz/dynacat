@@ -36,7 +36,6 @@
   - [Repository](#repository)
   - [Bookmarks](#bookmarks)
   - [Calendar](#calendar)
-  - [Calendar (legacy)](#calendar-legacy)
   - [ChangeDetection.io](#changedetectionio)
   - [Clock](#clock)
   - [Markets](#markets)
@@ -294,6 +293,7 @@ server:
 | base-url | string | no | |
 | assets-path | string | no | |
 | cache-dir | string | no | .cache |
+| db-path | string | no | /app/assets/dynacat.db |
 
 #### `host`
 The address which the server will listen on. Setting it to `localhost` means that only the machine that the server is running on will be able to access the dashboard. By default it will listen on all interfaces.
@@ -352,6 +352,9 @@ Directory where Dynacat stores cached remote images (for example, widget icons).
 
 If the path is relative, it will be resolved relative to the Dynacat working directory. The directory will be created if it does not exist.
 ```
+
+#### `db-path`
+Path to the SQLite database file used for server-side todo storage. Only required when at least one `to-do` widget has `storage: server` set. If the path is relative, it will be resolved relative to the Dynacat working directory. The file will be created if it does not exist.
 
 ## Document
 If you want to insert custom HTML into the `<head>` of the document for all pages, you can do so by using the `document` property. Example:
@@ -557,6 +560,7 @@ pages:
 | desktop-navigation-width | string | no | |
 | center-vertically | boolean | no | false |
 | hide-desktop-navigation | boolean | no | false |
+| hide-from-navigation | boolean | no | false |
 | show-mobile-header | boolean | no | false |
 | head-widgets | array | no | |
 | columns | array | yes | |
@@ -588,6 +592,9 @@ When set to `true`, vertically centers the content on the page. Has no effect if
 
 #### `hide-desktop-navigation`
 Whether to show the navigation links at the top of the page on desktop.
+
+#### `hide-from-navigation`
+Whether the page should be omitted from both the desktop and mobile navigation menus. When `true`, the page remains accessible via its slug (or links you place elsewhere) but does not appear in the navigation bar or the mobile navigation drawer.
 
 #### `show-mobile-header`
 Whether to show a header displaying the name of the page on mobile. The header purposefully has a lot of vertical whitespace in order to push the content down and make it easier to reach on tall devices.
@@ -1882,7 +1889,7 @@ Greenville, United States
 
 ### Todo
 
-A simple to-do list that allows you to add, edit and delete tasks. The tasks are stored in the browser's local storage.
+A simple to-do list that allows you to add, edit and delete tasks. By default, tasks are stored in the browser's local storage. Optionally, tasks can be stored in a server-side SQLite database for persistence across browsers and devices.
 
 Example:
 
@@ -1905,10 +1912,34 @@ To delete a task, hover over it and click on the trash icon.
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
 | id | string | no | |
+| storage | string | no | local |
 
 ##### `id`
 
-The ID of the todo list. If you want to have multiple todo lists, you must specify a different ID for each one. The ID is used to store the tasks in the browser's local storage. This means that if you have multiple todo lists with the same ID, they will share the same tasks.
+The ID of the todo list. If you want to have multiple todo lists, you must specify a different ID for each one. The ID is used to identify tasks in the chosen storage backend. Multiple todo lists with the same ID will share the same tasks.
+
+##### `storage`
+
+Controls where tasks are persisted. Accepted values:
+
+- `local` (default) — tasks are stored in the browser's localStorage, same as before. No server-side setup required.
+- `server` — tasks are stored in a SQLite database on the server. Tasks persist across browsers and server restarts. Requires `server.db-path` to be set (or uses the default `/app/assets/dynacat.db`).
+
+Example with server storage:
+
+```yaml
+server:
+  db-path: /data/dynacat.db
+
+pages:
+  - name: Home
+    columns:
+      - size: full
+        widgets:
+          - type: to-do
+            id: my-list
+            storage: server
+```
 
 #### Keyboard shortcuts
 | Keys | Action | Condition |
@@ -2759,37 +2790,6 @@ Preview:
 ##### `first-day-of-week`
 The day of the week that the calendar starts on. All week days are available as possible values.
 
-### Calendar (legacy)
-Display a calendar.
-
-Example:
-
-```yaml
-- type: calendar-legacy
-  start-sunday: false
-```
-
-Preview:
-
-![](images/calendar-legacy-widget-preview.png)
-
-> [!NOTE]
->
-> This widget is deprecated and may be removed in a future version.
-
-#### Properties
-
-| Name | Type | Required | Default |
-| ---- | ---- | -------- | ------- |
-| start-sunday | boolean | no | false |
-
-##### `start-sunday`
-Whether calendar weeks start on Sunday or Monday.
-
-> [!NOTE]
->
-> There is currently little customizability available for the calendar. Extra features will be added in the future.
-
 ### Markets
 Display a list of markets, their current value, change for the day and a small 21d chart. Data is taken from Yahoo Finance.
 
@@ -2994,6 +2994,7 @@ Example:
       token: ${PLEX_TOKEN}
     - url: jellyfin:https://jellyfin.example.com
       token: ${JELLYFIN_API_KEY}
+      allow-insecure: true
   show-thumbnail: true
   show-progress-bar: true
   group-by-host: false
@@ -3003,14 +3004,14 @@ Example:
 | Name | Type | Required | Default |
 | ---- | ---- | -------- | ------- |
 | hosts | array | yes | |
-| small-column | boolean | no | false |
 | play-state | string | no | indicator |
 | show-thumbnail | boolean | no | true |
 | show-paused | boolean | no | false |
 | show-progress-bar | boolean | no | true |
 | show-progress-info | boolean | no | true |
-| time-format | string | no | 24h |
 | group-by-host | boolean | no | false |
+| update-interval | string | no | 30s |
+| episode-title-format | string | no | series |
 
 ##### `hosts`
 
@@ -3039,11 +3040,6 @@ hosts:
     token: ${EMBY_API_KEY}
 ```
 
-##### `small-column`
-Set to `true` if using the widget in a small-sized column.
-
- 
-
 ##### `play-state`
 How to display the play state. Options:
 - `indicator`: Pulsing dot (green for playing, gray for paused)
@@ -3063,10 +3059,20 @@ When `true`, displays an animated progress bar showing playback progress.
 ##### `show-progress-info`
 When `true`, displays the estimated end time next to the progress bar. Requires `show-progress-bar` to be `true`.
 
-##### `time-format`
-Time format for displaying end times. Options:
-- `24h`: 24-hour format (e.g., "18:30")
-- `12h`: 12-hour format with AM/PM (e.g., "6:30pm")
+##### `episode-title-format`
+Controls how episode titles are displayed for episodic media. Options:
+- `series`: (default) Shows the series name with season/episode as the main title (for example: "Arcane - S2E4") and the episode name as a smaller subtitle below.
+- `episode`: shows the episode name as the main title and the series + SxEx as the subtitle.
+
+Example:
+
+```yaml
+- type: playing
+  hosts:
+    - url: plex:https://plex.example.com
+      token: ${PLEX_TOKEN}
+  episode-title-format: series
+```
 
 ##### `group-by-host`
 When `true`, groups sessions by their media server. When `false`, displays all sessions in a unified list.
@@ -3081,3 +3087,67 @@ When `true`, groups sessions by their media server. When `false`, displays all s
 
 **Emby:**
 - Requires an API key. Generate one in: ⚙️ (settings icon) → Advanced → API Keys
+
+### Torrenting
+
+Display active torrents from one or more qBittorrent instances.
+
+Example:
+
+```yaml
+- type: torrenting
+  hosts:
+    - url: http://192.168.1.1:8080
+      username: admin
+      password: adminadmin
+```
+
+#### Properties
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| hosts | array | yes | |
+| hide-completed | boolean | no | false |
+| hide-inactive | boolean | no | false |
+| hide-bar | boolean | no | false |
+| wrap-text | boolean | no | false |
+| collapse-after | number | no | 3 |
+| update-interval | string | no | 30s |
+
+##### `hosts`
+
+An array of qBittorrent instances to connect to.
+
+Properties for each host:
+
+| Name | Type | Required |
+| ---- | ---- | -------- |
+| url | string | yes |
+| username | string | yes |
+| password | string | yes |
+
+Example:
+
+```yaml
+hosts:
+  - url: http://192.168.1.1:8080
+    username: admin
+    password: adminadmin
+  - url: http://192.168.1.2:8080
+    username: admin
+    password: adminadmin
+```
+
+##### `hide-completed`
+When `true`, hides torrents that have finished downloading (progress = 100%).
+
+##### `hide-inactive`
+When `true`, hides torrents that are not actively downloading or uploading.
+
+##### `hide-bar`
+When `true`, hides the progress bar and download stats for incomplete torrents.
+
+##### `wrap-text`
+When `true`, allows torrent titles to wrap across multiple lines instead of being truncated with ellipsis. This displays the full title of each torrent.
+
+##### `collapse-after`
+Number of torrents to show before collapsing the rest behind a "Show more" toggle. Set to `0` to disable collapsing.

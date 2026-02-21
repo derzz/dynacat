@@ -6,3 +6,4 @@
 docs/dynadev.yml
 docker-test/
 Makefile
+.claude/

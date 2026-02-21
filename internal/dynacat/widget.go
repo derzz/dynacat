@@ -28,7 +28,7 @@ func newWidget(widgetType string) (widget, error) {
 	case "calendar":
 		w = &calendarWidget{}
 	case "calendar-legacy":
-		w = &oldCalendarWidget{}
+		return nil, errors.New("legacy calendar has been removed")
 	case "clock":
 		w = &clockWidget{}
 	case "weather":
@@ -83,6 +83,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &todoWidget{}
 	case "playing":
 		w = &playingWidget{}
+	case "torrenting":
+		w = &torrentingWidget{}
 	default:
 		return nil, fmt.Errorf("unknown widget type: %s", widgetType)
 	}

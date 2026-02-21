@@ -35,6 +35,7 @@ type config struct {
 		AssetsPath string `yaml:"assets-path"`
 		CacheDir   string `yaml:"cache-dir"`
 		BaseURL    string `yaml:"base-url"`
+		DBPath     string `yaml:"db-path"`
 	} `yaml:"server"`
 
 	Auth struct {
@@ -83,6 +84,7 @@ type page struct {
 	ShowMobileHeader       bool    `yaml:"show-mobile-header"`
 	HideDesktopNavigation  bool    `yaml:"hide-desktop-navigation"`
 	CenterVertically       bool    `yaml:"center-vertically"`
+	HideFromNavigation     bool    `yaml:"hide-from-navigation"`
 	HeadWidgets            widgets `yaml:"head-widgets"`
 	Columns                []struct {
 		Size    string  `yaml:"size"`

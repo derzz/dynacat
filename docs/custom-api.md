@@ -9,6 +9,7 @@ Custom API widgets support configurable client-side update intervals using the `
 The `update-interval` property accepts a number followed by a time unit:
 - `s` - seconds
 - `h` - hours
+ - `m` - minutes
 
 **Examples:**
 ```yaml
@@ -29,7 +30,7 @@ The `update-interval` property accepts a number followed by a time unit:
 
 ### Important Notes
 
-- **Only `s` and `h` units are supported.** Using other units like `m` (minutes) or `d` (days) will cause a configuration error.
+- **Only `s`, `m` and `h` units are supported.** Using other units like `d` (days) will cause a configuration error.
 - If `update-interval` is not specified, the widget will only update when the page's global update interval triggers.
 - The `update-interval` controls client-side refresh frequency. For server-side caching, use the `cache` property.
 - Each widget with an `update-interval` polls independently, allowing different widgets to update at different rates.
@@ -42,7 +43,6 @@ If you use an invalid format, Dynacat will log an error and fail to start. Commo
 ❌ Invalid:
 ```yaml
 update-interval: 5      # Missing time unit
-update-interval: 5m     # Minutes not supported
 update-interval: 1d     # Days not supported
 update-interval:        # Empty value
 ```
@@ -50,6 +50,7 @@ update-interval:        # Empty value
 ✅ Valid:
 ```yaml
 update-interval: 30s    # 30 seconds
+update-interval: 5m     # 5 minutes
 update-interval: 2h     # 2 hours
 ```
 
@@ -397,7 +398,7 @@ Output:
 
 <hr>
 
-By default, the `custom-api` widget content is refreshed on the page every 1 minute. If you want to change this, you can use the `update-interval` property:
+By default, the `custom-api` widget content is refreshed on the page every 10 seconds. If you want to change this, you can use the `update-interval` property:
 
 ```yaml
 - type: custom-api

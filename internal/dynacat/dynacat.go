@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -36,23 +38,27 @@ type application struct {
 
 	parsedManifest []byte
 
-	slugToPage map[string]*page
-	widgetByID map[uint64]widget
+	slugToPage   map[string]*page
+	widgetByID   map[uint64]widget
+	widgetToPage map[uint64]*page
 
 	RequiresAuth           bool
 	authSecretKey          []byte
 	usernameHashToUsername map[string]string
 	authAttemptsMu         sync.Mutex
 	failedAuthAttempts     map[string]*failedAuthAttempt
+
+	todoStorage *todoStorage
 }
 
 func newApplication(c *config) (*application, error) {
 	app := &application{
-		Version:    buildVersion,
-		CreatedAt:  time.Now(),
-		Config:     *c,
-		slugToPage: make(map[string]*page),
-		widgetByID: make(map[uint64]widget),
+		Version:      buildVersion,
+		CreatedAt:    time.Now(),
+		Config:       *c,
+		slugToPage:   make(map[string]*page),
+		widgetByID:   make(map[uint64]widget),
+		widgetToPage: make(map[uint64]*page),
 	}
 	config := &app.Config
 
@@ -192,10 +198,14 @@ func newApplication(c *config) (*application, error) {
 			page.DesktopNavigationWidth = page.Width
 		}
 
-		for i := range page.HeadWidgets {
-			widget := page.HeadWidgets[i]
+		registerWidget := func(widget widget) {
 			app.widgetByID[widget.GetID()] = widget
+			app.widgetToPage[widget.GetID()] = page
 			widget.setProviders(providers)
+		}
+
+		for i := range page.HeadWidgets {
+			registerWidget(page.HeadWidgets[i])
 		}
 
 		for c := range page.Columns {
@@ -206,9 +216,7 @@ func newApplication(c *config) (*application, error) {
 			}
 
 			for w := range column.Widgets {
-				widget := column.Widgets[w]
-				app.widgetByID[widget.GetID()] = widget
-				widget.setProviders(providers)
+				registerWidget(column.Widgets[w])
 			}
 		}
 	}
@@ -245,6 +253,42 @@ func newApplication(c *config) (*application, error) {
 		return nil, fmt.Errorf("parsing manifest.json: %v", err)
 	}
 	app.parsedManifest = []byte(manifest)
+
+	//
+	// Init todo storage
+	//
+
+	needsTodoDB := false
+	for p := range config.Pages {
+		for _, w := range config.Pages[p].HeadWidgets {
+			if tw, ok := w.(*todoWidget); ok && tw.Storage == "server" {
+				needsTodoDB = true
+				break
+			}
+		}
+		if needsTodoDB {
+			break
+		}
+		for c := range config.Pages[p].Columns {
+			for _, w := range config.Pages[p].Columns[c].Widgets {
+				if tw, ok := w.(*todoWidget); ok && tw.Storage == "server" {
+					needsTodoDB = true
+					break
+				}
+			}
+			if needsTodoDB {
+				break
+			}
+		}
+	}
+
+	if needsTodoDB {
+		dbPath := config.Server.DBPath
+		if dbPath == "" {
+			dbPath = "/app/assets/dynacat.db"
+		}
+		app.todoStorage = newTodoStorage(dbPath)
+	}
 
 	return app, nil
 }
@@ -472,27 +516,38 @@ func (a *application) handleNotFound(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte("Page not found"))
 }
 
-func (a *application) handleWidgetRequest(w http.ResponseWriter, r *http.Request) {
-	// TODO: this requires a rework of the widget update logic so that rather
-	// than locking the entire page we lock individual widgets
-	w.WriteHeader(http.StatusNotImplemented)
+func (a *application) handleWidgetContentRequest(w http.ResponseWriter, r *http.Request) {
+	if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
+		return
+	}
 
-	// widgetValue := r.PathValue("widget")
+	widgetValue := r.PathValue("widget")
+	widgetID, err := strconv.ParseUint(widgetValue, 10, 64)
+	if err != nil {
+		a.handleNotFound(w, r)
+		return
+	}
 
-	// widgetID, err := strconv.ParseUint(widgetValue, 10, 64)
-	// if err != nil {
-	// 	a.handleNotFound(w, r)
-	// 	return
-	// }
+	widget, exists := a.widgetByID[widgetID]
+	if !exists {
+		a.handleNotFound(w, r)
+		return
+	}
 
-	// widget, exists := a.widgetByID[widgetID]
+	page, exists := a.widgetToPage[widgetID]
+	if !exists {
+		a.handleNotFound(w, r)
+		return
+	}
 
-	// if !exists {
-	// 	a.handleNotFound(w, r)
-	// 	return
-	// }
+	page.mu.Lock()
+	defer page.mu.Unlock()
 
-	// widget.handleRequest(w, r)
+	widget.update(context.Background())
+
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(widget.Render()))
 }
 
 func (a *application) StaticAssetPath(asset string) string {
@@ -502,6 +557,49 @@ func (a *application) StaticAssetPath(asset string) string {
 func (a *application) VersionedAssetPath(asset string) string {
 	return a.Config.Server.BaseURL + asset +
 		"?v=" + strconv.FormatInt(a.CreatedAt.Unix(), 10)
+}
+
+func (a *application) handleTodoLoad(w http.ResponseWriter, r *http.Request) {
+	if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
+		return
+	}
+
+	listID := r.PathValue("listID")
+	tasks, err := a.todoStorage.loadTasks(listID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tasks)
+}
+
+func (a *application) handleTodoSave(w http.ResponseWriter, r *http.Request) {
+	if a.handleUnauthorizedResponse(w, r, showUnauthorizedJSON) {
+		return
+	}
+
+	listID := r.PathValue("listID")
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "reading body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var tasks []todoTask
+	if err := json.Unmarshal(body, &tasks); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := a.todoStorage.saveTasks(listID, tasks); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *application) server() (func() error, func() error) {
@@ -516,7 +614,7 @@ func (a *application) server() (func() error, func() error) {
 		mux.HandleFunc("POST /api/set-theme/{key}", a.handleThemeChangeRequest)
 	}
 
-	mux.HandleFunc("/api/widgets/{widget}/{path...}", a.handleWidgetRequest)
+	mux.HandleFunc("GET /api/widgets/{widget}/content/{$}", a.handleWidgetContentRequest)
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -525,6 +623,11 @@ func (a *application) server() (func() error, func() error) {
 		mux.HandleFunc("GET /login", a.handleLoginPageRequest)
 		mux.HandleFunc("GET /logout", a.handleLogoutRequest)
 		mux.HandleFunc("POST /api/authenticate", a.handleAuthenticationAttempt)
+	}
+
+	if a.todoStorage != nil {
+		mux.HandleFunc("GET /api/todo/{listID}", a.handleTodoLoad)
+		mux.HandleFunc("PUT /api/todo/{listID}", a.handleTodoSave)
 	}
 
 	mux.Handle(
