@@ -346,6 +346,26 @@ function setupLazyImages() {
     });
 }
 
+function getExpandedCollapsibleIndices(element) {
+    const allContainers = [...element.querySelectorAll('.collapsible-container')];
+    return allContainers
+        .map((c, i) => c.classList.contains('container-expanded') ? i : -1)
+        .filter(i => i !== -1);
+}
+
+function restoreExpandedCollapsibles(element, expandedIndices) {
+    if (!expandedIndices.length) return;
+    const allContainers = [...element.querySelectorAll('.collapsible-container')];
+    for (const index of expandedIndices) {
+        const container = allContainers[index];
+        if (!container) continue;
+        const button = container.nextElementSibling;
+        if (button && button.classList.contains('expand-toggle-button')) {
+            button.click();
+        }
+    }
+}
+
 function attachExpandToggleButton(collapsibleContainer) {
     const showMoreText = "Show more";
     const showLessText = "Show less";
@@ -826,17 +846,15 @@ async function updateWidget(widgetElement) {
     const scrollThreshold = 100; // pixels from bottom to be considered "at bottom"
     const wasAtBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - scrollThreshold);
 
+    const expandedIndices = getExpandedCollapsibleIndices(widgetElement);
+
     const newWidget = await fetchWidgetContent(widgetElement);
 
     if (newWidget && widgetElement.outerHTML !== newWidget.outerHTML) {
         const oldContent = widgetElement.querySelector('.widget-content');
         const newContent = newWidget.querySelector('.widget-content');
 
-        // Check if widget has images that we should preserve
-        const hasImages = oldContent && oldContent.querySelector('img[loading="lazy"]') !== null;
-        const shouldPreserveContent = hasImages || widgetElement.classList.contains('widget-type-custom-api');
-
-        if (shouldPreserveContent && oldContent && newContent) {
+        if (oldContent && newContent) {
             // Update content while preserving cached images
             updateContentPreservingImages(oldContent, newContent);
 
@@ -863,34 +881,9 @@ async function updateWidget(widgetElement) {
                 cb();
             }
 
+            restoreExpandedCollapsibles(widgetElement, expandedIndices);
+
             // Update any local playing progress updaters and thumbnail cropping after content changes
-            setupPlayingProgressUpdater();
-            setupPlayingThumbnailCropping();
-
-            restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt);
-        } else {
-            clearWidgetPollingState(widgetElement);
-
-            widgetElement.replaceWith(newWidget);
-
-            const callbacksIndexBefore = contentReadyCallbacks.length;
-
-            setupPopovers();
-            setupCarousels();
-            setupCollapsibleLists();
-            setupCollapsibleGrids();
-            setupGroups();
-            setupMasonries();
-            setupLazyImages();
-            setupTruncatedElementTitles();
-
-            const newCallbacks = contentReadyCallbacks.splice(callbacksIndexBefore);
-            for (const cb of newCallbacks) {
-                cb();
-            }
-
-            // Re-setup polling for the new widget if it has an update interval
-            setupWidgetPolling();
             setupPlayingProgressUpdater();
             setupPlayingThumbnailCropping();
 
@@ -902,31 +895,34 @@ async function updateWidget(widgetElement) {
 function updateContentPreservingImages(oldContent, newContent) {
     const oldImages = Array.from(oldContent.querySelectorAll('img[loading="lazy"]'));
     const newImages = Array.from(newContent.querySelectorAll('img[loading="lazy"]'));
-    
-    // Create a map of image src to old image elements
+
+    // Create a map of image src to the actual loaded old image elements
     const imageMap = new Map();
     for (const img of oldImages) {
-        imageMap.set(img.src, img);
+        if (!imageMap.has(img.src)) {
+            imageMap.set(img.src, img);
+        }
     }
-    
-    // Replace new images with old ones if src matches to preserve cached state
+
+    // Move actual old image elements into newContent to preserve in-memory cached state.
+    // Cloning and re-inserting via innerHTML creates new <img> DOM elements which
+    // causes the browser to refetch or re-validate images, wasting bandwidth.
     for (const newImg of newImages) {
         const oldImg = imageMap.get(newImg.src);
         if (oldImg) {
-            // Clone the old image to preserve its loaded state
-            const clonedImg = oldImg.cloneNode(true);
-            // Copy over any new attributes except src
+            // Copy over any new attributes except src and class (preserve old img's loaded state)
             for (const attr of newImg.attributes) {
                 if (attr.name !== 'src' && attr.name !== 'class') {
-                    clonedImg.setAttribute(attr.name, attr.value);
+                    oldImg.setAttribute(attr.name, attr.value);
                 }
             }
-            newImg.replaceWith(clonedImg);
+            newImg.replaceWith(oldImg);
         }
     }
-    
-    // Now update the content
-    oldContent.innerHTML = newContent.innerHTML;
+
+    // Swap the content element in the DOM directly instead of via innerHTML string
+    // round-trip, which would create new DOM elements and lose the cached image state.
+    oldContent.replaceWith(newContent);
 }
 
 function nowMs() {
@@ -1303,6 +1299,7 @@ async function applyContentUpdate() {
     const tempContainers = Array.from(tempDiv.querySelectorAll(".head-widgets, .page-column"));
 
     let anyReplaced = false;
+    const expandedIndicesMap = new Map();
 
     for (let i = 0; i < Math.min(realContainers.length, tempContainers.length); i++) {
         const realWidgets = Array.from(realContainers[i].children);
@@ -1312,15 +1309,13 @@ async function applyContentUpdate() {
             const realWidget = realWidgets[j];
             const tempWidget = tempWidgets[j];
 
+            expandedIndicesMap.set(realWidget, getExpandedCollapsibleIndices(realWidget));
+
             if (realWidget.dataset.updateInterval && realWidget.outerHTML !== tempWidget.outerHTML) {
                 const oldContent = realWidget.querySelector('.widget-content');
                 const newContent = tempWidget.querySelector('.widget-content');
 
-                // Check if widget has images that we should preserve
-                const hasImages = oldContent && oldContent.querySelector('img[loading="lazy"]') !== null;
-                const shouldPreserveContent = hasImages || realWidget.classList.contains('widget-type-custom-api');
-
-                if (shouldPreserveContent && oldContent && newContent) {
+                if (oldContent && newContent) {
                     // Update content while preserving cached images
                     updateContentPreservingImages(oldContent, newContent);
 
@@ -1331,11 +1326,6 @@ async function applyContentUpdate() {
                         oldHeader.innerHTML = newHeader.innerHTML;
                     }
 
-                    anyReplaced = true;
-                } else {
-                    clearWidgetPollingState(realWidget);
-
-                    realWidget.replaceWith(tempWidget);
                     anyReplaced = true;
                 }
             }
@@ -1360,8 +1350,10 @@ async function applyContentUpdate() {
             cb();
         }
 
-        // Re-setup custom-api widget polling for any replaced widgets
-        setupWidgetPolling();
+        for (const [widget, indices] of expandedIndicesMap) {
+            restoreExpandedCollapsibles(widget, indices);
+        }
+
         setupPlayingProgressUpdater();
 
         restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt);
