@@ -857,8 +857,7 @@ async function updateWidget(widgetElement) {
     setupUserScrollIntentTracking();
 
     const refreshStartedAt = nowMs();
-    const scrollThreshold = 100;
-    const wasAtBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - scrollThreshold);
+    const scrollYBefore = window.scrollY;
     const expandedIndices = getExpandedCollapsibleIndices(widgetElement);
     const newWidget = await fetchWidgetContent(widgetElement);
 
@@ -904,7 +903,7 @@ async function updateWidget(widgetElement) {
             restoreExpandedCollapsibles(widgetElement, expandedIndices);
             setupPlayingProgressUpdater();
             setupPlayingThumbnailCropping();
-            restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt);
+            restoreScrollAfterRefresh(scrollYBefore, refreshStartedAt);
         }
     }
 }
@@ -971,11 +970,7 @@ function setupUserScrollIntentTracking() {
     userScrollIntentTrackingInitialized = true;
 }
 
-function restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt) {
-    if (!wasAtBottom) {
-        return;
-    }
-
+function restoreScrollAfterRefresh(scrollYBefore, refreshStartedAt) {
     const recentScrollThresholdMs = 2000;
     const shouldSkipRestore = () => {
         const timeSinceLastScroll = nowMs() - lastUserScrollIntentAt;
@@ -988,7 +983,9 @@ function restoreScrollAfterRefresh(wasAtBottom, refreshStartedAt) {
             return;
         }
 
-        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+        const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        const targetY = Math.min(scrollYBefore, maxScroll);
+        window.scrollTo({ top: targetY, behavior: 'auto' });
         pendingScrollRestoreFrameId = null;
     };
 
