@@ -24,12 +24,20 @@ body:
 
         **No need to copy the above list into your description, it's just a guide to help you provide the most useful information.**
 
+  - type: input
+    id: ver
+    validations:
+      required: true
+    attributes:
+      label: Version
+      
   - type: textarea
     id: description
     validations:
       required: true
     attributes:
       label: Description
+
 
   - type: markdown
     attributes:
