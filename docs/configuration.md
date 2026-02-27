@@ -1916,6 +1916,7 @@ To delete a task, hover over it and click on the trash icon.
 | ---- | ---- | -------- | ------- |
 | id | string | no | |
 | storage | string | no | local |
+| collapse-after | integer | no | |
 
 ##### `id`
 
@@ -1927,6 +1928,10 @@ Controls where tasks are persisted. Accepted values:
 
 - `local` (default) — tasks are stored in the browser's localStorage, same as before. No server-side setup required.
 - `server` — tasks are stored in a SQLite database on the server. Tasks persist across browsers and server restarts. Requires `server.db-path` to be set (or uses the default `/app/assets/dynacat.db`).
+
+##### `collapse-after`
+
+When set, shows only the first N tasks and adds a "Show more" toggle for the rest. This is opt-in for the to-do widget and is disabled by default. Set to `-1` to explicitly disable collapsing.
 
 Example with server storage:
 

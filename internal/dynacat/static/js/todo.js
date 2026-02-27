@@ -8,7 +8,11 @@ const trashIconSvg = `<svg fill="currentColor" xmlns="http://www.w3.org/2000/svg
 
 export default function(element) {
     element.swapWith(
-        Todo(element.dataset.todoId, element.dataset.todoStorage)
+        Todo(
+            element.dataset.todoId,
+            element.dataset.todoStorage,
+            element.dataset.todoCollapseAfter
+        )
     )
 }
 
@@ -114,14 +118,59 @@ function Item(unserialize = {}, onUpdate, onDelete, onEscape, onDragStart) {
     });
 }
 
-function Todo(id, storageType) {
+function Todo(id, storageType, collapseAfterConfig) {
     const useServer = storageType === "server";
+    const parsedCollapseAfter = collapseAfterConfig === undefined
+        ? NaN
+        : parseInt(collapseAfterConfig, 10);
+    const shouldCollapse = Number.isInteger(parsedCollapseAfter) && parsedCollapseAfter >= 0;
+    const collapseAfter = shouldCollapse ? parsedCollapseAfter : 0;
     let items, input, inputArea, inputContainer, lastAddedItem;
+    let expandButton, expandButtonTextNode;
     let queuedForRemoval = 0;
     let reorderable;
     let isDragging = false;
+    let isExpanded = false;
 
-    const onDragEnd = () => isDragging = false;
+    const applyCollapsibleState = () => {
+        if (!shouldCollapse) {
+            return;
+        }
+
+        const shouldShowButton = items.children.length > collapseAfter;
+        if (shouldShowButton) {
+            if (!expandButton.isConnected) {
+                items.after(expandButton);
+            }
+        } else if (expandButton.isConnected) {
+            expandButton.remove();
+        }
+
+        if (!shouldShowButton) {
+            isExpanded = false;
+            items.classList.remove("container-expanded");
+            expandButton.classList.remove("container-expanded");
+            expandButtonTextNode.nodeValue = "Show more";
+        }
+
+        for (let i = 0; i < items.children.length; i++) {
+            const child = items.children[i];
+            const isCollapsibleItem = i >= collapseAfter;
+
+            child.classesIf(isCollapsibleItem, "collapsible-item");
+
+            if (isCollapsibleItem) {
+                child.style.animationDelay = ((i - collapseAfter) * 20).toString() + "ms";
+            } else {
+                child.style.removeProperty("animation-delay");
+            }
+        }
+    };
+
+    const onDragEnd = () => {
+        isDragging = false;
+        applyCollapsibleState();
+    };
     const onDragStart = (event, element) => {
         isDragging = true;
         reorderable.component.onDragStart(event, element);
@@ -149,6 +198,7 @@ function Todo(id, storageType) {
             item.remove();
             queuedForRemoval--;
             saveItems();
+            applyCollapsibleState();
         });
 
         if (items.children.length - queuedForRemoval === 0)
@@ -171,6 +221,7 @@ function Todo(id, storageType) {
         saveItems();
         const height = item.clientHeight;
         item.animate(itemAnim(height));
+        applyCollapsibleState();
 
         if (totalItemsBeforeAppending === 0)
             inputContainer.animate(inputMarginAnim());
@@ -200,20 +251,28 @@ function Todo(id, storageType) {
 
     items = elem()
         .classes("todo-items")
+        .classesIf(shouldCollapse, "collapsible-container")
         .append(
             ...initialData.map(data => newItem(data))
         );
 
-    if (useServer) {
-        loadFromServer(id).then(data => {
-            items.append(...data.map(d => newItem(d)));
-            if (data.length > 0) {
-                inputContainer.classes("margin-bottom-15");
-            }
-        });
+    if (shouldCollapse) {
+        expandButtonTextNode = document.createTextNode("Show more");
+        expandButton = elem("button")
+            .classes("expand-toggle-button")
+            .append(
+                expandButtonTextNode,
+                elem("span").classes("expand-toggle-button-icon")
+            )
+            .on("click", () => {
+                isExpanded = !isExpanded;
+                items.classesIf(isExpanded, "container-expanded");
+                expandButton.classesIf(isExpanded, "container-expanded");
+                expandButtonTextNode.nodeValue = isExpanded ? "Show less" : "Show more";
+            });
     }
 
-    return fragment().append(
+    const todoElement = fragment().append(
         inputContainer = elem()
             .classes("todo-input", "flex", "gap-10", "items-center")
             .classesIf(items.children.length > 0, "margin-bottom-15")
@@ -231,6 +290,20 @@ function Todo(id, storageType) {
 
         reorderable = verticallyReorderable(items, onItemRepositioned, onDragEnd),
     );
+
+    applyCollapsibleState();
+
+    if (useServer) {
+        loadFromServer(id).then(data => {
+            items.append(...data.map(d => newItem(d)));
+            if (data.length > 0) {
+                inputContainer.classes("margin-bottom-15");
+            }
+            applyCollapsibleState();
+        });
+    }
+
+    return todoElement;
 }
 
 
