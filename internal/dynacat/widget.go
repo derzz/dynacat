@@ -85,6 +85,8 @@ func newWidget(widgetType string) (widget, error) {
 		w = &todoWidget{}
 	case "playing":
 		w = &playingWidget{}
+	case "latest-media":
+		w = &latestMediaWidget{}
 	case "torrenting":
 		w = &torrentingWidget{}
 	default:

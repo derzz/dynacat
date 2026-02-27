@@ -47,6 +47,7 @@
 - [External Integrations](#external-integrations)
   - [Currently Playing](#currently-playing)
   - [Torrenting](#Torrenting)
+  - [Latest Media](#latest-media)
 ## Preconfigured page
 If you don't want to spend time reading through all the available configuration options and just want something to get you going quickly you can use [this `dynacat.yml` file](dynacat.yml) and make changes to it as you see fit. It will give you a page that looks like the following:
 
@@ -3226,3 +3227,94 @@ When `true`, allows torrent titles to wrap across multiple lines instead of bein
 
 ##### `collapse-after`
 Number of torrents to show before collapsing the rest behind a "Show more" toggle. Set to `0` to disable collapsing.
+
+### Latest Media
+
+Display a poster grid of recently added items from Plex, Jellyfin, and/or Emby. Each card shows a portrait thumbnail with an optional dark gradient overlay containing the title, year, duration (movies only), and how long ago it was added.
+
+Example:
+
+```yaml
+- type: latest-media
+  title: Recently Added
+  update-interval: 30m
+  item-count: 12
+  columns: 4
+  hosts:
+    - url: jellyfin:https://jellyfin.example.com
+      token: ${JELLYFIN_KEY}
+    - url: plex:https://plex.example.com
+      token: ${PLEX_TOKEN}
+    - url: emby:https://emby.example.com
+      token: ${EMBY_KEY}
+```
+
+Preview:
+![](images/latest-media-preview.png)
+
+#### Properties
+
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| hosts | array | yes | |
+| item-count | integer | no | 12 |
+| columns | integer | no | 4 |
+| small-column | boolean | no | false |
+| show-overlay | boolean | no | true |
+| update-interval | string | no | 30m |
+
+##### `hosts`
+
+An array of media server hosts to fetch recently added items from. Results from all hosts are merged and sorted by date added (newest first), then trimmed to `item-count`.
+
+**Important**: Each host URL must be prefixed with the server type (`plex:`, `jellyfin:`, or `emby:`). For example:
+- `plex:https://192.168.1.10:32400`
+- `jellyfin:http://jellyfin.local:8096`
+- `emby:https://emby.example.com`
+
+Properties for each host:
+
+| Name | Type | Required | Default | Notes |
+| ---- | ---- | -------- | ------- | ----- |
+| url | string | yes | | Must include server type prefix |
+| token | string | yes | | API key or token for authentication |
+| allow-insecure | boolean | no | false | Ignore invalid/self-signed certificates |
+| libraries | array of strings | no | | Filter to specific library names; omit to fetch from all libraries |
+
+Example with library filtering:
+
+```yaml
+hosts:
+  - url: jellyfin:https://jellyfin.example.com
+    token: ${JELLYFIN_API_KEY}
+    libraries:
+      - Movies
+      - TV Shows
+  - url: plex:https://plex.example.com
+    token: ${PLEX_TOKEN}
+    libraries:
+      - Movies
+```
+
+##### `item-count`
+The total number of items to display across all hosts combined.
+
+##### `columns`
+The number of columns in the poster grid. Default is `4`.
+
+##### `small-column`
+When set to `true`, halves the number of columns. Useful when placing the widget in a narrow column. For example, with `columns: 4` and `small-column: true`, the grid will use 2 columns.
+
+##### `show-overlay`
+When `true` (default), each card displays a dark gradient overlay at the bottom containing the title, year, duration (movies only), and relative time since it was added. Set to `false` to show only the poster thumbnail without any overlay text.
+
+#### API Access & Tokens
+
+**Plex:**
+- Requires a Plex token. Follow [this guide](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) to obtain your token.
+
+**Jellyfin:**
+- Requires an API key. Generate one in: Administration → Dashboard → API Keys
+
+**Emby:**
+- Requires an API key. Generate one in: ⚙️ (settings icon) → Advanced → API Keys
