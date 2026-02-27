@@ -134,8 +134,11 @@
         {{ range .Items }}
         <a class="latest-media-card" {{ if .LinkURL }}href="{{ .LinkURL }}" target="_blank" rel="noreferrer"{{ end }}>
 
-            {{ if .ThumbnailURL }}
-                <img class="latest-media-thumb" src="{{ .ThumbnailURL }}" alt="{{ .Title }}" loading="lazy">
+            {{ if or .CoverURL .ThumbnailURL }}
+                <img class="latest-media-thumb"
+                    src="{{ if .CoverURL }}{{ .CoverURL }}{{ else }}{{ .ThumbnailURL }}{{ end }}"
+                    {{ if and .CoverURL .ThumbnailURL }}onerror="this.onerror=null;this.src='{{ .ThumbnailURL }}';"{{ end }}
+                    alt="{{ .Title }}" loading="lazy">
             {{ else }}
                 <div class="latest-media-thumb-placeholder">
                     {{ if eq .MediaType "movie" }}

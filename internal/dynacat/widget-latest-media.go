@@ -39,18 +39,19 @@ type latestMediaHostConfig struct {
 }
 
 type latestMediaItem struct {
-	ServerType   string
-	ServerURL    string
-	Title        string
-	Year         int
-	MediaType    string
-	SeriesTitle  string
-	AddedAt      time.Time
-	Duration     int64
-	ThumbnailURL string
-	LinkURL      string
-	TimeAgo      string
-	DurationStr  string
+	ServerType      string
+	ServerURL       string
+	Title           string
+	Year            int
+	MediaType       string
+	SeriesTitle     string
+	AddedAt         time.Time
+	Duration        int64
+	CoverURL        string
+	ThumbnailURL    string
+	LinkURL         string
+	TimeAgo         string
+	DurationStr     string
 }
 
 func (widget *latestMediaWidget) initialize() error {
@@ -220,7 +221,9 @@ type plexRecentlyAddedResponse struct {
 			Duration         int64  `json:"duration"`
 			AddedAt          int64  `json:"addedAt"`
 			Thumb            string `json:"thumb"`
+			Art              string `json:"art"`
 			GrandparentThumb string `json:"grandparentThumb"`
+			GrandparentArt   string `json:"grandparentArt"`
 			Key              string `json:"key"`
 		} `json:"Metadata"`
 	} `json:"MediaContainer"`
@@ -284,11 +287,20 @@ func (widget *latestMediaWidget) fetchPlexLatest(ctx context.Context, host *late
 			}
 
 			thumbPath := meta.Thumb
-			if meta.Type == "episode" && meta.GrandparentThumb != "" {
-				thumbPath = meta.GrandparentThumb
+			artPath := meta.Art
+			if meta.Type == "episode" {
+				if meta.GrandparentThumb != "" {
+					thumbPath = meta.GrandparentThumb
+				}
+				if meta.GrandparentArt != "" {
+					artPath = meta.GrandparentArt
+				}
 			}
 			if thumbPath != "" {
 				item.ThumbnailURL = fmt.Sprintf("%s%s?X-Plex-Token=%s", baseURL, thumbPath, host.Token)
+			}
+			if artPath != "" {
+				item.CoverURL = fmt.Sprintf("%s%s?X-Plex-Token=%s", baseURL, artPath, host.Token)
 			}
 
 			item.LinkURL = fmt.Sprintf("%s/web/index.html#!/server", baseURL)
@@ -433,6 +445,7 @@ func (widget *latestMediaWidget) fetchJellyfinEmbyLatestFromParent(
 		}
 
 		if raw.Id != "" {
+			item.CoverURL = fmt.Sprintf("%s/Items/%s/Images/Art?api_key=%s", baseURL, raw.Id, host.Token)
 			item.ThumbnailURL = fmt.Sprintf("%s/Items/%s/Images/Primary?api_key=%s", baseURL, raw.Id, host.Token)
 			item.LinkURL = fmt.Sprintf("%s/web/index.html#!/details?id=%s", baseURL, raw.Id)
 		}
