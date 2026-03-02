@@ -1467,6 +1467,7 @@ document.body.addEventListener('htmx:afterSettle', function(event) {
         setupCarousels();
         setupGroups();
         setupMasonries();
+        setupDynamicRelativeTime();
         setupLazyImages();
         setupTruncatedElementTitles();
         setupPlayingProgressUpdater();
