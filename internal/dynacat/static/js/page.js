@@ -334,15 +334,30 @@ function setupLazyImages() {
                 if (image.dataset.lazyInitialized) continue;
                 image.dataset.lazyInitialized = "true";
 
+                const handleLoad = () => {
+                    image.classList.add("loaded");
+                    setTimeout(() => imageFinishedTransition(image), 400);
+                };
+
+                const handleError = () => {
+                    const fallbackSrc = image.dataset.fallbackSrc;
+                    if (fallbackSrc && image.src !== fallbackSrc) {
+                        image.src = fallbackSrc;
+                    }
+                };
+
                 if (image.complete) {
-                    image.classList.add("cached");
-                    setTimeout(() => imageFinishedTransition(image), 1);
+                    // Check if the image loaded successfully
+                    if (image.naturalHeight > 0) {
+                        image.classList.add("cached");
+                        setTimeout(() => imageFinishedTransition(image), 1);
+                    } else {
+                        // Image failed to load, try fallback
+                        handleError();
+                    }
                 } else {
-                    // TODO: also handle error event
-                    image.addEventListener("load", () => {
-                        image.classList.add("loaded");
-                        setTimeout(() => imageFinishedTransition(image), 400);
-                    });
+                    image.addEventListener("load", handleLoad);
+                    image.addEventListener("error", handleError);
                 }
             }
         }, 1);

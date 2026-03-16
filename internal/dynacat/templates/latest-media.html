@@ -137,8 +137,9 @@
             {{ if or .CoverURL .ThumbnailURL }}
                 <img class="latest-media-thumb"
                     src="{{ if .CoverURL }}{{ .CoverURL }}{{ else }}{{ .ThumbnailURL }}{{ end }}"
-                    {{ if and .CoverURL .ThumbnailURL }}onerror="this.onerror=null;this.src='{{ .ThumbnailURL }}';"{{ end }}
-                    alt="{{ .Title }}" loading="lazy">
+                    alt="{{ .Title }}" loading="lazy"
+                    {{ if and .CoverURL .ThumbnailURL }}data-fallback-src="{{ .ThumbnailURL }}"{{ end }}>
+
             {{ else }}
                 <div class="latest-media-thumb-placeholder">
                     {{ if eq .MediaType "movie" }}
