@@ -309,6 +309,7 @@ function setupGroups() {
                 title.classList.add("widget-group-title-current");
                 title.setAttribute("aria-selected", "true");
                 tabs[t].classList.add("widget-group-content-current");
+                tabs[t].style.animation = '';
                 tabs[t].setAttribute("aria-hidden", "false");
             });
         }
@@ -1440,9 +1441,7 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
     setupCollapsibleLists();
     setupCollapsibleGrids();
 
-    let indices = target._expandedCollapsibleIndices;
-    if (!indices?.length) return;
-
+    // Disable scroll-anchor to prevent browser from scrolling when widget height changes.
     const htmlElem = document.documentElement;
     const prevAnchor = htmlElem.style.overflowAnchor;
     htmlElem.style.overflowAnchor = 'none';
@@ -1453,11 +1452,30 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
             const liveTarget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
             if (liveTarget) {
                 target = liveTarget;
-                target._expandedCollapsibleIndices = indices;
             }
         }
 
-        restoreExpandedCollapsibles(target, indices);
+        let indices = target._expandedCollapsibleIndices;
+        if (indices?.length) {
+            target._expandedCollapsibleIndices = indices;
+            restoreExpandedCollapsibles(target, indices);
+        }
+
+        // Restore lazy image states immediately to prevent flicker.
+        const lazyImages = target.querySelectorAll('img[loading=lazy]');
+        for (let i = 0; i < lazyImages.length; i++) {
+            const img = lazyImages[i];
+            if (img.complete && img.naturalHeight > 0) {
+                img.classList.add('cached', 'finished-transition');
+                img.dataset.lazyInitialized = 'true';
+            }
+        }
+
+        // Suppress group animation re-trigger during morph updates.
+        const groupContents = target.querySelectorAll('.widget-group-content');
+        for (let i = 0; i < groupContents.length; i++) {
+            groupContents[i].style.animation = 'none';
+        }
     } finally {
         htmlElem.style.overflowAnchor = prevAnchor;
     }
