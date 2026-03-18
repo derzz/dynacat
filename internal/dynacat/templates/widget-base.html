@@ -2,10 +2,6 @@
      data-widget-id="{{ .GetID }}"
      {{ if and .UpdateInterval (.IsDynamicUpdateEnabled) }}
      data-update-interval="{{ .UpdateInterval.Milliseconds }}"
-     hx-get="{{ .GetBaseURL }}/api/widgets/{{ .GetID }}/content/"
-     hx-trigger="every {{ .UpdateInterval.Milliseconds }}ms, refresh"
-     hx-swap="morph:outerHTML"
-     hx-target="this"
      {{ end }}
      {{ block "widget-data-attrs" . }}{{ end }}>
     {{- if not .HideHeader }}

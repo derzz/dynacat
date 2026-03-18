@@ -211,10 +211,14 @@ function setupSearchBoxes() {
 }
 
 function setupDynamicRelativeTime() {
+    // Always do an immediate update pass (new elements may have arrived)
+    updateRelativeTimeForElements(document.querySelectorAll("[data-dynamic-relative-time]"));
+
+    if (dynamicRelativeTimeInitialized) return;
+    dynamicRelativeTimeInitialized = true;
+
     const updateInterval = 60 * 1000;
     let lastUpdateTime = Date.now();
-
-    updateRelativeTimeForElements(document.querySelectorAll("[data-dynamic-relative-time]"));
 
     const updateElementsAndTimestamp = () => {
         updateRelativeTimeForElements(document.querySelectorAll("[data-dynamic-relative-time]"));
@@ -552,6 +556,7 @@ function setupCollapsibleGrids() {
 
 const contentReadyCallbacks = [];
 let pageSetupComplete = false;
+let dynamicRelativeTimeInitialized = false;
 
 function afterContentReady(callback) {
     contentReadyCallbacks.push(callback);
@@ -835,6 +840,7 @@ async function setupPage() {
         }
 
         pageSetupComplete = true;
+        _initSSE();
 
         setTimeout(() => {
             setupTruncatedElementTitles();
@@ -1419,10 +1425,21 @@ function startPolling() {
 
 window.dynacatRefreshWidget = async function(widgetId) {
     const widget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
-    if (widget) await updateWidget(widget);
+    if (widget) {
+        await updateWidget(widget);
+        return;
+    }
+
+    _dynacatFetchAndApplyWidget(widgetId);
 };
 
-window.dynacatSetupPopovers = setupPopovers;
+function _dynacatFetchAndApplyWidget(widgetId) {
+    const url = `${pageData.baseURL}/api/widgets/${widgetId}/content/`;
+    fetch(url, { credentials: 'include' })
+        .then(r => r.ok ? r.text() : Promise.reject(r.status))
+        .then(html => _applyWidgetUpdate(widgetId, html))
+        .catch(err => console.error('Widget refresh failed', widgetId, err));
+}
 
 document.body.addEventListener('htmx:beforeRequest', function(event) {
     if (document.hidden) event.preventDefault();
@@ -1434,35 +1451,29 @@ document.body.addEventListener('htmx:beforeSwap', function(event) {
     target._expandedCollapsibleIndices = getExpandedCollapsibleIndices(target);
 });
 
-document.body.addEventListener('htmx:afterSwap', function(event) {
-    let target = event.detail.target;
-    if (!target?.classList?.contains('widget')) return;
-    // Always re-attach toggle buttons after morph (they aren't in server HTML).
-    setupCollapsibleLists();
-    setupCollapsibleGrids();
+function _applyWidgetUpdate(widgetId, html) {
+    const target = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
+    if (!target) return;
 
-    // Disable scroll-anchor to prevent browser from scrolling when widget height changes.
+    const expandedIndices = getExpandedCollapsibleIndices(target);
     const htmlElem = document.documentElement;
     const prevAnchor = htmlElem.style.overflowAnchor;
     htmlElem.style.overflowAnchor = 'none';
 
     try {
-        const widgetId = target.dataset.widgetId;
-        if (widgetId) {
-            const liveTarget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
-            if (liveTarget) {
-                target = liveTarget;
-            }
+        Idiomorph.morph(target, html, { morphStyle: 'outerHTML' });
+
+        const liveTarget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
+        if (!liveTarget) return;
+
+        setupCollapsibleLists();
+        setupCollapsibleGrids();
+
+        if (expandedIndices?.length) {
+            restoreExpandedCollapsibles(liveTarget, expandedIndices);
         }
 
-        let indices = target._expandedCollapsibleIndices;
-        if (indices?.length) {
-            target._expandedCollapsibleIndices = indices;
-            restoreExpandedCollapsibles(target, indices);
-        }
-
-        // Restore lazy image states immediately to prevent flicker.
-        const lazyImages = target.querySelectorAll('img[loading=lazy]');
+        const lazyImages = liveTarget.querySelectorAll('img[loading=lazy]');
         for (let i = 0; i < lazyImages.length; i++) {
             const img = lazyImages[i];
             if (img.complete && img.naturalHeight > 0) {
@@ -1471,15 +1482,17 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
             }
         }
 
-        // Suppress group animation re-trigger during morph updates.
-        const groupContents = target.querySelectorAll('.widget-group-content');
+        const groupContents = liveTarget.querySelectorAll('.widget-group-content');
         for (let i = 0; i < groupContents.length; i++) {
             groupContents[i].style.animation = 'none';
         }
+
+        _runPostSettleSetup();
+
     } finally {
         htmlElem.style.overflowAnchor = prevAnchor;
     }
-});
+}
 
 document.body.addEventListener('htmx:afterSettle', function(event) {
     let target = event.detail.target;
@@ -1493,20 +1506,96 @@ document.body.addEventListener('htmx:afterSettle', function(event) {
         const widgetId = target.dataset.widgetId;
         if (widgetId) {
             const liveTarget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
-            if (liveTarget) target = liveTarget;
+            if (liveTarget) {
+                target = liveTarget;
+            }
         }
 
-        setupPopovers();
-        setupCarousels();
-        setupGroups();
-        setupMasonries();
-        setupDynamicRelativeTime();
-        setupLazyImages();
-        setupTruncatedElementTitles();
-        setupPlayingProgressUpdater();
-        setupPlayingThumbnailCropping();
-
+        _runPostSettleSetup();
         delete target._expandedCollapsibleIndices;
+    } finally {
+        htmlElem.style.overflowAnchor = prevAnchor;
+    }
+});
+
+function _runPostSettleSetup() {
+    setupPopovers();
+    setupCarousels();
+    setupGroups();
+    setupMasonries();
+    setupDynamicRelativeTime();
+    setupLazyImages();
+    setupTruncatedElementTitles();
+    setupPlayingProgressUpdater();
+    setupPlayingThumbnailCropping();
+}
+
+let _sseSource = null;
+
+function _initSSE() {
+    if (!pageData.dynamicUpdateEnabled) {
+        return;
+    }
+
+    const url = `${pageData.baseURL}/api/sse/updates`;
+    _sseSource = new EventSource(url, { withCredentials: true });
+
+    _sseSource.addEventListener('widget-update', function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            _applyWidgetUpdate(data.widgetId, data.html);
+        } catch (e) {
+            console.error('SSE parse error', e);
+        }
+    });
+
+    _sseSource.onerror = function() {
+        if (_sseSource.readyState === EventSource.CLOSED) {
+            window.location.reload();
+        }
+    };
+}
+
+window.dynacatSetupPopovers = setupPopovers;
+
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    let target = event.detail.target;
+    if (!target?.classList?.contains('widget')) return;
+
+    setupCollapsibleLists();
+    setupCollapsibleGrids();
+
+    const htmlElem = document.documentElement;
+    const prevAnchor = htmlElem.style.overflowAnchor;
+    htmlElem.style.overflowAnchor = 'none';
+
+    try {
+        const widgetId = target.dataset.widgetId;
+        if (widgetId) {
+            const liveTarget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
+            if (liveTarget) {
+                target = liveTarget;
+            }
+        }
+
+        const indices = target._expandedCollapsibleIndices;
+        if (indices?.length) {
+            restoreExpandedCollapsibles(target, indices);
+        }
+
+        const lazyImages = target.querySelectorAll('img[loading=lazy]');
+        for (let i = 0; i < lazyImages.length; i++) {
+            const img = lazyImages[i];
+            if (img.complete && img.naturalHeight > 0) {
+                img.classList.add('cached', 'finished-transition');
+                img.dataset.lazyInitialized = 'true';
+            }
+        }
+
+        const groupContents = target.querySelectorAll('.widget-group-content');
+        for (let i = 0; i < groupContents.length; i++) {
+            groupContents[i].style.animation = 'none';
+        }
     } finally {
         htmlElem.style.overflowAnchor = prevAnchor;
     }

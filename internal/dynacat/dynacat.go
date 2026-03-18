@@ -49,6 +49,10 @@ type application struct {
 	failedAuthAttempts     map[string]*failedAuthAttempt
 
 	todoStorage *todoStorage
+
+	sseMu               sync.RWMutex
+	sseClients          map[*sseClient]struct{}
+	DynamicUpdateEnabled bool
 }
 
 func newApplication(c *config) (*application, error) {
@@ -59,6 +63,7 @@ func newApplication(c *config) (*application, error) {
 		slugToPage:   make(map[string]*page),
 		widgetByID:   make(map[uint64]widget),
 		widgetToPage: make(map[uint64]*page),
+		sseClients:   make(map[*sseClient]struct{}),
 	}
 	config := &app.Config
 
@@ -175,6 +180,8 @@ func newApplication(c *config) (*application, error) {
 	if v := os.Getenv("ENABLE_DYNAMIC_UPDATE"); v == "false" || v == "0" || v == "f" {
 		dynamicUpdateEnabled = false
 	}
+
+	app.DynamicUpdateEnabled = dynamicUpdateEnabled
 
 	providers := &widgetProviders{
 		assetResolver:        app.StaticAssetPath,
@@ -298,6 +305,29 @@ func newApplication(c *config) (*application, error) {
 	}
 
 	return app, nil
+}
+
+func (a *application) sseRegisterClient(c *sseClient) {
+	a.sseMu.Lock()
+	a.sseClients[c] = struct{}{}
+	a.sseMu.Unlock()
+}
+
+func (a *application) sseUnregisterClient(c *sseClient) {
+	a.sseMu.Lock()
+	delete(a.sseClients, c)
+	a.sseMu.Unlock()
+}
+
+func (a *application) sseBroadcast(msg string) {
+	a.sseMu.RLock()
+	defer a.sseMu.RUnlock()
+	for c := range a.sseClients {
+		select {
+		case c.ch <- msg:
+		default: // client too slow; drop rather than block
+		}
+	}
 }
 
 func (p *page) updateOutdatedWidgets() {
@@ -643,6 +673,7 @@ func (a *application) server() (func() error, func() error) {
 
 	mux.HandleFunc("GET /api/widgets/{widget}/content/{$}", a.handleWidgetContentRequest)
 	mux.HandleFunc("POST /api/widgets/{widget}/action/{action...}", a.handleWidgetActionRequest)
+	mux.HandleFunc("GET /api/sse/updates", a.handleSSEUpdates)
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -720,7 +751,11 @@ func (a *application) server() (func() error, func() error) {
 		return nil
 	}
 
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	go a.sseUpdateLoop(ctx)
+
 	stop := func() error {
+		cancelCtx()
 		return server.Close()
 	}
 
