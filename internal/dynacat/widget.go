@@ -180,6 +180,35 @@ type widgetProviders struct {
 	imageCache           *imageCache
 	baseURL              string
 	DynamicUpdateEnabled bool
+	app                  *application
+}
+
+// SecureImageURL processes an image URL through the caching and proxy system.
+// Returns either a cached URL, a proxy URL without credentials, or empty string on error.
+// If allowInsecure is true, self-signed certificates will be accepted.
+func (p *widgetProviders) SecureImageURL(ctx context.Context, imageURL string, allowInsecure bool) string {
+	if imageURL == "" {
+		return ""
+	}
+
+	hash := hashString(imageURL)
+
+	// Register with the application's image proxy for on-demand serving
+	if p.app != nil {
+		p.app.registerImageProxy(hash, imageURL, allowInsecure)
+	}
+
+	// Try to cache the image
+	if p.imageCache != nil {
+		cachedURL, err := p.imageCache.CacheURLWithClient(ctx, imageURL, allowInsecure)
+		if err == nil && cachedURL != "" {
+			// Successfully cached, return the cached URL
+			return cachedURL
+		}
+	}
+
+	// Fall back to proxy URL (doesn't expose credentials)
+	return fmt.Sprintf("/api/image-proxy/%s", hash)
 }
 
 func (w *widgetBase) requiresUpdate(now *time.Time) bool {

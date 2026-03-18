@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -27,6 +28,8 @@ type latestMediaWidget struct {
 
 	mu    sync.RWMutex
 	Items []latestMediaItem
+	// Track which hosts allow insecure connections for image caching
+	hostAllowInsecure map[string]bool `yaml:"-"`
 }
 
 type latestMediaHostConfig struct {
@@ -86,6 +89,8 @@ func (widget *latestMediaWidget) initialize() error {
 		return fmt.Errorf("at least one host must be specified")
 	}
 
+	widget.hostAllowInsecure = make(map[string]bool)
+
 	for i := range widget.Hosts {
 		host := &widget.Hosts[i]
 		if host.URL == "" {
@@ -102,6 +107,7 @@ func (widget *latestMediaWidget) initialize() error {
 
 		host.ServerType = serverType
 		host.BaseURL = baseURL
+		widget.hostAllowInsecure[baseURL] = host.AllowInsecure
 	}
 
 	return nil
@@ -173,6 +179,9 @@ func (widget *latestMediaWidget) update(ctx context.Context) {
 	widget.mu.Lock()
 	widget.Items = allItems
 	widget.mu.Unlock()
+
+	// Cache image URLs with the appropriate insecure setting
+	widget.cacheImageURLs()
 
 	var err error
 	if successCount == 0 {
@@ -458,6 +467,19 @@ func (widget *latestMediaWidget) fetchJellyfinEmbyLatestFromParent(
 
 // --- Helpers ---
 
+// stripAPIKeysFromError removes sensitive API keys from error messages
+func stripAPIKeysFromError(err error) string {
+	if err == nil {
+		return ""
+	}
+	errStr := err.Error()
+	// Strip api_key parameter from URLs
+	errStr = regexp.MustCompile(`api_key=[^&\s"']+`).ReplaceAllString(errStr, "api_key=***")
+	// Strip X-Plex-Token from URLs (if it appears in the error)
+	errStr = regexp.MustCompile(`X-Plex-Token=[^&\s"']+`).ReplaceAllString(errStr, "X-Plex-Token=***")
+	return errStr
+}
+
 func containsString(slice []string, s string) bool {
 	for _, v := range slice {
 		if v == s {
@@ -505,6 +527,80 @@ func formatTimeAgo(t time.Time, now time.Time) string {
 			return "1mo ago"
 		}
 		return fmt.Sprintf("%dmo ago", mo)
+	}
+}
+
+func (widget *latestMediaWidget) setProviders(providers *widgetProviders) {
+	widget.widgetBase.setProviders(providers)
+	widget.cacheImageURLs()
+}
+
+func (widget *latestMediaWidget) cacheImageURLs() {
+	widget.mu.Lock()
+	defer widget.mu.Unlock()
+
+	ctx := context.Background()
+	for i := range widget.Items {
+		item := &widget.Items[i]
+		allowInsecure := widget.hostAllowInsecure[item.ServerURL]
+
+		// Process cover URL
+		if item.CoverURL != "" {
+			originalURL := item.CoverURL
+			hash := hashString(originalURL)
+
+			// Register with the application's image proxy
+			if widget.Providers != nil && widget.Providers.app != nil {
+				widget.Providers.app.registerImageProxy(hash, originalURL, allowInsecure)
+			}
+
+			// Try to cache the image
+			if widget.Providers != nil && widget.Providers.imageCache != nil {
+				cachedURL, err := widget.Providers.imageCache.CacheURLWithClient(ctx, originalURL, allowInsecure)
+				if err == nil && cachedURL != "" {
+					// Successfully cached, use the cached URL
+					item.CoverURL = cachedURL
+				} else {
+					// Failed to cache, use a proxy URL that doesn't expose the API key
+					item.CoverURL = fmt.Sprintf("/api/image-proxy/%s", hash)
+					if err != nil {
+						slog.Debug("failed to cache cover image, using proxy", "hash", hash, "error", stripAPIKeysFromError(err))
+					}
+				}
+			} else {
+				// No cache available, use proxy URL
+				item.CoverURL = fmt.Sprintf("/api/image-proxy/%s", hash)
+			}
+		}
+
+		// Process thumbnail URL
+		if item.ThumbnailURL != "" {
+			originalURL := item.ThumbnailURL
+			hash := hashString(originalURL)
+
+			// Register with the application's image proxy
+			if widget.Providers != nil && widget.Providers.app != nil {
+				widget.Providers.app.registerImageProxy(hash, originalURL, allowInsecure)
+			}
+
+			// Try to cache the image
+			if widget.Providers != nil && widget.Providers.imageCache != nil {
+				cachedURL, err := widget.Providers.imageCache.CacheURLWithClient(ctx, originalURL, allowInsecure)
+				if err == nil && cachedURL != "" {
+					// Successfully cached, use the cached URL
+					item.ThumbnailURL = cachedURL
+				} else {
+					// Failed to cache, use a proxy URL that doesn't expose the API key
+					item.ThumbnailURL = fmt.Sprintf("/api/image-proxy/%s", hash)
+					if err != nil {
+						slog.Debug("failed to cache thumbnail image, using proxy", "hash", hash, "error", stripAPIKeysFromError(err))
+					}
+				}
+			} else {
+				// No cache available, use proxy URL
+				item.ThumbnailURL = fmt.Sprintf("/api/image-proxy/%s", hash)
+			}
+		}
 	}
 }
 

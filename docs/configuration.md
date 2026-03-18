@@ -1,6 +1,7 @@
 # Configuring Dynacat
 
 - [Preconfigured page](#preconfigured-page)
+- [Docker & Server Options](docker-options.md)
 - [The config file](#the-config-file)
   - [Auto reload](#auto-reload)
   - [Environment variables](#environment-variables)
@@ -3323,3 +3324,30 @@ When `true` (default), each card displays a dark gradient overlay at the bottom 
 
 **Emby:**
 - Requires an API key. Generate one in: ⚙️ (settings icon) → Advanced → API Keys
+
+#### Image Caching & API Key Security
+
+All images displayed in the Latest Media widget are automatically cached on the Dynacat server. This approach provides several benefits:
+
+**API Key Security:**
+- API keys are **never exposed to the client/browser**
+- The server fetches images on behalf of the client using the provided credentials
+- The browser only receives local cached image URLs without any authentication tokens
+
+**Performance & Bandwidth:**
+- Images are downloaded once by the server and cached locally
+- Subsequent requests reuse the cached images instead of fetching from the media server again
+- Reduces bandwidth usage and load on your media server
+- Cached images are served with long-term cache headers for additional browser caching
+
+**Self-Signed Certificates:**
+When using self-signed or invalid certificates on your media server, set `allow-insecure: true` for that host:
+
+```yaml
+hosts:
+  - url: jellyfin:https://jellyfin.local:8920
+    token: ${JELLYFIN_API_KEY}
+    allow-insecure: true
+```
+
+The server will use an insecure HTTP client to fetch both metadata and images, while the browser only receives the cached local URLs and never needs to establish a direct connection to your media server.

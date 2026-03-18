@@ -1531,6 +1531,15 @@ function _runPostSettleSetup() {
 }
 
 let _sseSource = null;
+let _intentionallyClosed = false;
+
+function _closeSSE() {
+    if (_sseSource) {
+        _intentionallyClosed = true;
+        _sseSource.close();
+        _sseSource = null;
+    }
+}
 
 function _initSSE() {
     if (!pageData.dynamicUpdateEnabled) {
@@ -1550,11 +1559,16 @@ function _initSSE() {
     });
 
     _sseSource.onerror = function() {
+        if (_intentionallyClosed) {
+            return;
+        }
         if (_sseSource.readyState === EventSource.CLOSED) {
             window.location.reload();
         }
     };
 }
+
+window.addEventListener('beforeunload', _closeSSE);
 
 window.dynacatSetupPopovers = setupPopovers;
 

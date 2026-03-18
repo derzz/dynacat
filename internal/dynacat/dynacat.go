@@ -31,6 +31,11 @@ const REMOTE_IMAGE_CACHE_DURATION = 7 * 24 * time.Hour
 
 var reservedPageSlugs = []string{"login", "logout"}
 
+type imageProxyInfo struct {
+	URL            string
+	AllowInsecure  bool
+}
+
 type application struct {
 	Version   string
 	CreatedAt time.Time
@@ -53,6 +58,9 @@ type application struct {
 	sseMu               sync.RWMutex
 	sseClients          map[*sseClient]struct{}
 	DynamicUpdateEnabled bool
+
+	imageProxyMu  sync.RWMutex
+	imageProxyURLs map[string]imageProxyInfo
 }
 
 func newApplication(c *config) (*application, error) {
@@ -64,6 +72,7 @@ func newApplication(c *config) (*application, error) {
 		widgetByID:   make(map[uint64]widget),
 		widgetToPage: make(map[uint64]*page),
 		sseClients:   make(map[*sseClient]struct{}),
+		imageProxyURLs: make(map[string]imageProxyInfo),
 	}
 	config := &app.Config
 
@@ -188,6 +197,7 @@ func newApplication(c *config) (*application, error) {
 		imageCache:           newImageCache(config.Server.BaseURL, config.Server.CacheDir),
 		baseURL:              config.Server.BaseURL,
 		DynamicUpdateEnabled: dynamicUpdateEnabled,
+		app:                  app,
 	}
 
 	for p := range config.Pages {
@@ -674,6 +684,7 @@ func (a *application) server() (func() error, func() error) {
 	mux.HandleFunc("GET /api/widgets/{widget}/content/{$}", a.handleWidgetContentRequest)
 	mux.HandleFunc("POST /api/widgets/{widget}/action/{action...}", a.handleWidgetActionRequest)
 	mux.HandleFunc("GET /api/sse/updates", a.handleSSEUpdates)
+	mux.HandleFunc("GET /api/image-proxy/{hash}", a.handleImageProxyRequest)
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
