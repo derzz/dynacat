@@ -815,7 +815,6 @@ async function setupPage() {
     const pageContent = await fetchPageContent(pageData);
 
     pageContentElement.innerHTML = pageContent;
-    htmx.process(pageContentElement);
 
     try {
         setupPopovers();
@@ -925,6 +924,7 @@ async function updateWidget(widgetElement) {
             restoreExpandedCollapsibles(widgetElement, expandedIndices);
             setupPlayingProgressUpdater();
             setupPlayingThumbnailCropping();
+            notifyWidgetUpdated(widgetElement);
 
             const widgetTopAfter = widgetElement.getBoundingClientRect().top;
             const topDelta = widgetTopAfter - widgetTopBefore;
@@ -961,6 +961,16 @@ function updateContentPreservingImages(oldContent, newContent) {
     }
 
     oldContent.replaceWith(newContent);
+}
+
+function notifyWidgetUpdated(widgetElement) {
+    widgetElement.dispatchEvent(new CustomEvent('dynacat:widget-updated', {
+        bubbles: true,
+        detail: {
+            widget: widgetElement,
+            widgetId: widgetElement.dataset.widgetId || null,
+        },
+    }));
 }
 
 function nowMs() {
@@ -1288,6 +1298,7 @@ async function applyContentUpdate() {
 
     let anyReplaced = false;
     const expandedIndicesMap = new Map();
+    const updatedWidgets = [];
 
     for (let i = 0; i < Math.min(realContainers.length, tempContainers.length); i++) {
         const realWidgets = Array.from(realContainers[i].children);
@@ -1313,6 +1324,7 @@ async function applyContentUpdate() {
                     }
 
                     anyReplaced = true;
+                    updatedWidgets.push(realWidget);
                 }
             }
         }
@@ -1341,6 +1353,9 @@ async function applyContentUpdate() {
         }
 
         setupPlayingProgressUpdater();
+        for (const widget of updatedWidgets) {
+            notifyWidgetUpdated(widget);
+        }
 
         const userScrolledDuringRefresh = lastUserScrollIntentAt > refreshStartedAt;
 
@@ -1441,16 +1456,6 @@ function _dynacatFetchAndApplyWidget(widgetId) {
         .catch(err => console.error('Widget refresh failed', widgetId, err));
 }
 
-document.body.addEventListener('htmx:beforeRequest', function(event) {
-    if (document.hidden) event.preventDefault();
-});
-
-document.body.addEventListener('htmx:beforeSwap', function(event) {
-    const target = event.detail.target;
-    if (!target?.classList?.contains('widget')) return;
-    target._expandedCollapsibleIndices = getExpandedCollapsibleIndices(target);
-});
-
 function _applyWidgetUpdate(widgetId, html) {
     const target = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
     if (!target) return;
@@ -1488,35 +1493,12 @@ function _applyWidgetUpdate(widgetId, html) {
         }
 
         _runPostSettleSetup();
+        notifyWidgetUpdated(liveTarget);
 
     } finally {
         htmlElem.style.overflowAnchor = prevAnchor;
     }
 }
-
-document.body.addEventListener('htmx:afterSettle', function(event) {
-    let target = event.detail.target;
-    if (!target?.classList?.contains('widget')) return;
-
-    const htmlElem = document.documentElement;
-    const prevAnchor = htmlElem.style.overflowAnchor;
-    htmlElem.style.overflowAnchor = 'none';
-
-    try {
-        const widgetId = target.dataset.widgetId;
-        if (widgetId) {
-            const liveTarget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
-            if (liveTarget) {
-                target = liveTarget;
-            }
-        }
-
-        _runPostSettleSetup();
-        delete target._expandedCollapsibleIndices;
-    } finally {
-        htmlElem.style.overflowAnchor = prevAnchor;
-    }
-});
 
 function _runPostSettleSetup() {
     setupPopovers();
@@ -1571,49 +1553,6 @@ function _initSSE() {
 window.addEventListener('beforeunload', _closeSSE);
 
 window.dynacatSetupPopovers = setupPopovers;
-
-document.body.addEventListener('htmx:afterSwap', function(event) {
-    let target = event.detail.target;
-    if (!target?.classList?.contains('widget')) return;
-
-    setupCollapsibleLists();
-    setupCollapsibleGrids();
-
-    const htmlElem = document.documentElement;
-    const prevAnchor = htmlElem.style.overflowAnchor;
-    htmlElem.style.overflowAnchor = 'none';
-
-    try {
-        const widgetId = target.dataset.widgetId;
-        if (widgetId) {
-            const liveTarget = document.querySelector(`.widget[data-widget-id="${widgetId}"]`);
-            if (liveTarget) {
-                target = liveTarget;
-            }
-        }
-
-        const indices = target._expandedCollapsibleIndices;
-        if (indices?.length) {
-            restoreExpandedCollapsibles(target, indices);
-        }
-
-        const lazyImages = target.querySelectorAll('img[loading=lazy]');
-        for (let i = 0; i < lazyImages.length; i++) {
-            const img = lazyImages[i];
-            if (img.complete && img.naturalHeight > 0) {
-                img.classList.add('cached', 'finished-transition');
-                img.dataset.lazyInitialized = 'true';
-            }
-        }
-
-        const groupContents = target.querySelectorAll('.widget-group-content');
-        for (let i = 0; i < groupContents.length; i++) {
-            groupContents[i].style.animation = 'none';
-        }
-    } finally {
-        htmlElem.style.overflowAnchor = prevAnchor;
-    }
-});
 
 setupPage().then(() => {
     startPolling();

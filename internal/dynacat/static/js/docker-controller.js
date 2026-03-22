@@ -246,13 +246,12 @@
         return row ? row.querySelector('.docker-ctrl-icon-btn.remove') : null;
     }
 
-    // After a widget morph, re-apply confirming visuals to any buttons that were in confirm state.
-    document.addEventListener('htmx:afterSettle', function (event) {
-        const target = event.detail.target;
-        if (!target?.classList?.contains('widget')) return;
-        const widgetId = target.dataset.widgetId;
+    // After a widget update, re-apply confirming visuals to any buttons that were in confirm state.
+    document.addEventListener('dynacat:widget-updated', function (event) {
+        const widget = event.detail?.widget;
+        const widgetId = event.detail?.widgetId || widget?.dataset?.widgetId;
         if (!widgetId) return;
-        for (const [key, state] of confirmingItems) {
+        for (const [key] of confirmingItems) {
             const [wid, type, id] = key.split(':');
             if (wid !== widgetId) continue;
             const btn = findRemoveBtn(widgetId, type, id);
