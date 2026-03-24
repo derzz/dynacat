@@ -246,6 +246,16 @@ docker logs dynacat
 
 <hr>
 </details>
+<details>
+<summary><strong>Coming from Glance</strong></summary>
+If you have already set up glance you're only one step away from switching to Dynacat!
+
+All you have to do is replace your current image (`glanceapp/glance:latest`) with one from below:
+
+```yaml
+panonim/dynacat:latest
+```
+</details>
 <br>
 
 ### Environment Variables
